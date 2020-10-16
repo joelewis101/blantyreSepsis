@@ -35,12 +35,15 @@ Rylance<sup>1,2</sup>, Nicholas A Feasey<sup>1,2</sup>
 
 ## Installing and accessing data
 
-Install the package from [GitHub](https://github.com/)
+Install the package from GitHub:
 
 ``` r
 install.packages("devtools")
 devtools::install_github("joelewis101/blantreSepsis")
 ```
+
+Or check out the source code at
+[GitHub](https://github.com/joelewis101/blantyreSepsis)
 
 Six datasets are included in the package; for details and variable
 definitions access the associated help file (e.g via `?BTparticipants`)
