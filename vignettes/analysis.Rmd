@@ -61,18 +61,14 @@ This analysis is available as a package vignette by typing `vignette("analysis")
 ### Setup and load packages
 
 ```{r setup, message= FALSE}
+library(survival)
 library(blantyreSepsis)
-#library(plyr)
-#library(reshape2)
 library(tidyverse)
 library(kableExtra)
 library(ggplotify)
 library(UpSetR)
 library(eulerr)
-#library(scales)
 library(patchwork)
-#library(knitr)
-library(survival)
 library(survminer)
 library(wBoot)
 library(viridis)
@@ -2456,5 +2452,14 @@ mort.model.plot.final
 #ggsave( "figures/MAIN_mort_model.plot.jpeg",
 #        mort.model.plot.final, 
 #        width = 8, height = 8, units = "in")
+
+```
+
+
+### Reproducability
+
+```{r sessioninfo}
+
+sessionInfo()
 
 ```
