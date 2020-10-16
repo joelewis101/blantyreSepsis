@@ -1,0 +1,2460 @@
+---
+title: "Aetiology and determinants of outcome in sepsis in an urban african centre: an observational cohort study"
+subtitle: "Reproducible analysis code"
+author: |
+  | Joe Lewis
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+The BlantyreSepsis R package contains contains data code to replicate the analysis of the manuscript:
+  
+<br />
+
+*Aetiology and determinants of outcome in sepsis in an urban African centre: an observational cohort study*
+
+<br />
+
+Joseph M Lewis^1,2,3^, , Madlitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Brian Faragher^2^, Melita Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
+
+1. Malawi Liverpool Wellcome Clinical Research Programme, Blantyre, Malawi
+2. Department of Clinical Sciences, Liverpool School of Tropical Medicine, Liverpool, UK
+3. Department of Clinical Infection, Microbiology and Immunology, University of Liverpool, Liverpool, UK
+4. Rare and Imported Pathogens Laboratory, Public Health England, UK
+5. Malawi College of Medicine, University of Malawi
+
+## Installing and accessing data
+
+Install the package from github 
+
+```{r eval= FALSE}
+install.packages("devtools")
+devtools::install_github("joelewis101/blantreSepsis")
+```
+
+Six datasets are included in the package; for details and variable definitions access the associated help file (e.g via `?BTparticipants`)
+
+* `BTparticipants` - Baseline characteristics and investigation results for included participants
+* `BTtreatments` - Antimicrobial therapy and intravenous fluid therapy received by included participants
+* `BTaetiology` - Results of malaria testing, aerobic blood culture, cerebrospinalfluid culture, tuberculosis diagnostic tests
+* `BTsera` - Results of serologic tests for arboviruses, Rickettsioses, Leptospirosis
+* `BTarraycard` - Results of multiplex PCR test for high consequence pathogens
+* `BTbc` - Results of aerobic blood culture
+
+This analysis is available as a package vignette by typing `vignette("analysis")` and the code is accessed either via the associated .Rmd file or by typing `edit(vigentte("analysis"))`.
+
+## Descriptive analysis
+
+### Setup and load packages
+
+```{r setup, message= FALSE}
+library(blantyreSepsis)
+#library(plyr)
+#library(reshape2)
+library(tidyverse)
+library(kableExtra)
+library(ggplotify)
+library(UpSetR)
+library(eulerr)
+#library(scales)
+library(patchwork)
+#library(knitr)
+library(survival)
+library(survminer)
+library(wBoot)
+library(viridis)
+library(brms)
+library(pheatmap)
+library(factoextra)
+library(mice)
+library(bayesplot)
+library(splines)
+
+
+#function for bootstrapping differnce in proportions
+
+propz <- function(dat) {
+  out <- sum(dat==1, na.rm = TRUE) / length(dat)
+  return(out)
+}
+
+```
+
+### Demographics of included patients
+
+```{r t1}
+
+# Table of demographics
+
+BTparticipants %>% 
+  mutate(
+    gcs_lessthan_15 = if_else(gcs < 15, true =  "yes", false = "no"),
+  ) %>% 
+  select(
+    calc_age,
+    ptsex,
+    hivstatus,
+    cd4_absolute, 
+    hivonart,  
+    art_time, 
+    hivcpt,
+    ever_tb, 
+    tbongoing,
+    screentemp,
+    t0hr,
+    t0rr,
+    t0sbp, 
+    t0dbp, 
+    t0spo2, 
+    gcs_lessthan_15, 
+    ustand,
+    days_unwell,
+    haemoglobin,
+    platelets, 
+    wcc, 
+    sodium,
+    potassium, 
+    co2, 
+    creatinine, 
+    lactate
+    ) %>% 
+  do(pretty_tbl_df(.,vars_to_char = c("ustand"),
+                   vars_to_specify_rounding = c(
+                     "screentemp" = 1,
+                     "haemoglobin" = 1,
+                     "potassium" = 1,
+                     "lactate" = 1),
+                   confint = FALSE)) %>%
+  filter(!levels %in% c("Non reactive",
+                        "No",
+                        "no",
+                        "0",
+                        "Female")) %>%
+  mutate(levels = case_when(
+    variable == "calc_age" ~ "Age (years), median (IQR)",
+    variable == "ptsex" ~ "Male sex n/N (%)",
+    variable == "hivstatus" ~ "HIV infected*, n/N (%)",
+    variable == "hivonart" ~ "Receiving antiretroviral therapy, n/N (%)",
+    variable == "cd4_Absolute" ~ "CD4 lymphocyte count (10^6^/L), median (IQR)",
+    variable == "art_time" ~ 
+      "Time on antiretroviral therapy (months), median (IQR)",
+    variable == "hivcpt" ~ 
+      "Receiving co-trimoxazole preventative therapy, n/N (%)",
+    variable == "ever_tb" ~ "History of receiving TB treatment n/N (%)",
+    variable == "tbongoing" ~ 
+      "Of those, currently receiving TB treatment n/N (%)",
+    variable == "screentemp" ~ "Temperature (C), median (IQR)",
+    variable == "t0hr" ~ "Heart rate (beats/min), median (IQR)",
+    variable == "t0rr" ~ "Respiratory rate (breaths/min), median (IQR)",
+    variable == "t0sbp" ~ "Systolic blood pressure (mmHg), median (IQR)", 
+    variable == "t0dbp" ~ "Diastolic blood pressure (mmHg), median (IQR)", 
+    variable == "t0spo2" ~ "Oxygen saturation (%), median (IQR)",
+    variable == "gcs_lessthan_15" ~ "Glasgow coma score < 15 n/N (%)",
+    variable ==  "ustand" ~ "Unable to stand unaided n/N (%)",
+    variable ==  "days_unwell" ~ 
+      "Length of time unwell for (days), median (IQR)", 
+    variable ==  "haemoglobin" ~ "Haemoglobin (g/dL), median (IQR)",
+    variable ==  "platelets" ~ "platelets (10^9^/l), median (IQR)",
+    variable ==  "wcc" ~ "White cell count (10^9^/l), median (IQR)",
+    variable ==  "sodium" ~ "Sodium (mmol/L), median (IQR)", 
+    variable ==  "potassium" ~ "Potassium (mmol/L), median (IQR)", 
+    variable ==  "co2" ~ "Bicarbonate (mmol/L), median (IQR)", 
+    variable ==  "creatinine" ~ "Creatinine (mmol/L), median (IQR)", 
+    variable ==  "lactate" ~ "Lactate (mmol/L), median (IQR)", 
+    TRUE ~ levels),
+    
+    variable = case_when(
+      variable %in% c("calc_age",
+                      "ptsex") ~ "Demographics",
+      variable %in% c("hivstatus",
+                      "cd4_absolute",
+                      "hivonart",
+                      "art_time",
+                      "hivcpt",
+                      "ever_tb",
+                      "tbongoing") ~ "HIV/TB status",
+      str_detect(variable, "t0") | 
+        variable %in% c("screentemp",
+                        "gcs_lessthan_15",
+                        "ustand",
+                        "days_unwell") ~ "Physiology",
+      variable %in% c("haemoglobin",
+                      "platelets",
+                      "wcc",
+                      "sodium",
+                      "potassium",
+                      "co2",
+                      "creatinine",
+                      "lactate") ~ "Laboratory parameters"
+    )
+  ) -> t1
+
+t1 %>%
+  select(-variable) %>%
+  kbl(col.names = c("Variable", "Value"),
+   caption = "TABLE 1: baseline characteristics of included participants") %>%
+  kable_classic(full_width = FALSE) %>%
+  pack_rows(index = make_kable_rowgroup_string(t1, variable)) %>% 
+  footnote(symbol  = c("HIV status missing for 12 participants"))
+
+```
+
+### Treatments administered
+
+```{r ts2}
+
+# Table of treatments administered
+
+BTtreatment %>% 
+  select(-c(pid, iv_fluid_6hr)) %>% 
+  mutate(ab = if_else(is.na(which_ab), "no", "antibacterial"),
+         antifungal = if_else(is.na(which_antifungal), "no",
+                              "antifungal"),
+         antimalarial = if_else(is.na(which_antimalarial), "no",
+                                "antimalarial"),
+         antitb = if_else(is.na(which_antitb), "no",
+                                "antitb")) %>% 
+  pretty_tbl_df(vars_to_specify_rounding = c("timeto_ab" = 1,
+                                             "timeto_antifungal" = 1,
+                                             "timeto_antimalarial" = 1,
+                                             "timeto_antitb" = 1),
+                                             confint = FALSE) %>% 
+  mutate(variable = gsub("timeto_", "", variable)) %>% 
+  filter(levels != "no") -> t2
+
+left_join(
+  filter(t2, levels != "Median (IQR)"),
+  t2 %>% 
+    filter(levels == "Median (IQR)") %>% 
+    select(-levels),
+  by = "variable"
+) -> t2
+
+t2$variable <- factor(t2$variable, 
+                         levels = c("ab", "which_ab",
+                                    "antitb", "which_antitb",
+                                    "antifungal", "which_antifungal",
+                                    "antimalarial", "which_antimalarial"))
+
+t2[order(t2$variable),] -> t2
+indentrows <- which(grepl("which", t2$variable))
+
+t2 %>%
+  mutate(levels = case_when(
+    levels == "antitb" ~ "Antitubercular",
+    levels == "RHZE" ~ "RHZE",
+    levels == "Lumefantrine-Artemether" ~ "Lumefantrine-Artemether",
+    TRUE ~ str_to_title(levels)),
+    value.y = if_else(is.na(value.y), "", value.y)
+    ) %>% 
+    select(-variable) %>% 
+  kbl(caption = "SUPPLEMENTARY TABLE 2: Antimicroial therapies administered.",
+      col.names = c("Antimicrobial therapy", 
+                    "No. (proportion [95% CI]) participants", 
+                    "Median (IQR) hours to administration"),
+      row.names = FALSE,
+      ) %>%
+    kable_classic(full_width = FALSE) %>%
+    add_indent(indentrows, all_cols = TRUE) %>%
+    row_spec(indentrows, italic = TRUE) %>% 
+    footnote(
+      general = str_wrap(paste0(
+        "RHZE = standard antituberculous chemotherapy: ",
+        "Rifampicin (R), Isoniaid (H), Pyrazinamide (Z) ",
+        "and Ethambutol (E)")), 
+      symbol = str_wrap(paste0(
+      "10/63 participants who received antitubercular ", 
+      "agents during admission were taking them prior to ", 
+      "admission; they are excluded from the ", 
+      "calculation of median door-to-antimicrobial ", 
+      "time for this class. "),80),
+             footnote_as_chunk = TRUE)
+
+```
+
+### Aetiology
+
+
+```{r t2}
+
+# Table of aetiology
+
+BTaetiology %>% 
+  select(-c(`mtb bsi`,uLAM, Xpert,bact_target_pcr, CrAg_LFA)) %>%  
+  pivot_longer(-c(pid,hivstatus)) %>%
+  dplyr::group_by(name) %>%
+   dplyr::summarise(n_pos = sum(value == 1, na.rm = TRUE),
+            n_neg = sum(value == 0 , na.rm = TRUE),
+            n_positive_tests= n_pos/(n_pos+n_neg),
+            n_positive_tests_lci =binom.test(n_pos, n_pos+n_neg)$conf.int[1],
+            n_positive_tests_uci =binom.test(n_pos, n_pos+n_neg)$conf.int[2],
+            
+            positive_tests = paste0(n_pos,"/", n_pos + n_neg),
+            positive_tests_prop = paste0(sp_dc(n_positive_tests*100,1), "%"),
+            positive_tests_prop_ci = paste0("(",sp_dc(n_positive_tests_lci*100,1),
+                                           "-",
+                                           sp_dc(n_positive_tests_uci*100,1),
+                                           "%)"),
+            n_prev= n_pos/225,
+            n_prev_lci =binom.test(n_pos, 225)$conf.int[1],
+            n_prev_uci =binom.test(n_pos, 225)$conf.int[2],
+            prevalence = paste0(n_pos,"/225"),
+            prevalence_prop = paste0("",sp_dc(n_prev*100,1), "%"),
+            prevalence_prop_ci = paste0("(", sp_dc(n_prev_lci*100,1), "-",
+                                sp_dc(n_prev_uci*100,1),"%)"
+                                )
+   ) %>% ungroup() %>% 
+  arrange((fct_relevel(name, 
+    "tb",
+    "bsi.bacterial","csf.bacterial","inv.bacterial",
+    "chik", "dengue","arbovirus",
+    "malaria",
+    "bsi.fungal","csf.fungal","inv.fungal",
+    "SF", "ET","ricks", 
+    "lepto", "borrelia", "rift_valley_fever"))) %>%
+  mutate(across(contains("prevalence"),  
+                ~ if_else(name %in% c("bsi.bacterial",
+                                      "csf.bacterial",
+                                      "chik",
+                                      "dengue",
+                                      "bsi.fungal",
+                                      "csf.fungal",
+                                      "SF",
+                                      "ET"), 
+                          "",
+                          .)
+  )) %>% 
+  mutate(name = recode(name,
+                "tb" = "Tuberculosis",
+                "bsi.bacterial" = "Bloodstream infection",
+                "csf.bacterial" = "Meningitis",
+                "inv.bacterial" = "Any invasive bacterial infection",
+                "bsi.fungal" = "Bloodstream infection",
+                "csf.fungal" = "Meningitis",
+                "inv.fungal" = "Any invasive fungal infection",
+                "chik" = "Chikungunya",
+                "dengue" = "Dengue",
+                "arbovirus" = "Any arbovirus infection",
+                "malaria" = "Falciparum malaria",
+                "SF" = "Spotted fever group",
+                "ET" = "Epidemic typhus group",
+                "ricks" = "Total",
+                "lepto" = "Leptospirosis",
+                "borrelia" = "Borreliosis",
+                "rift_valley_fever" = "Rift Valley fever",
+                )) %>%
+  select(name, positive_tests, positive_tests_prop,positive_tests_prop_ci, 
+         prevalence, prevalence_prop, prevalence_prop_ci) %>% 
+  kbl(caption = 
+        "TABLE 2: Positive diagnostic tests and minimum disease prevalence.",
+      col.names = c("Diagnosis", 
+                    "n/N",
+                    "%",
+                    "(95% CI)",
+                    "n/N",
+                    "%",
+                    "95% CI"),
+    row.names = FALSE,
+    ) %>%
+  kable_classic(full_width = FALSE) %>% 
+  #add_indent(c(1,4,7,10,11,14,15,16,17), level_of_indent = -1) %>%
+ # row_spec(c(2,3,5,6,9,10,12,13), italic = TRUE) %>%
+  add_header_above(c(" ", "Proportion of paricipants with positive result" = 3,
+                     "Cohort minimum prevalence" = 3)) %>% 
+  pack_rows("Tuberculosis",1,1) %>%
+  pack_rows("Invasive bacterial infection",2,4) %>%
+  pack_rows("Arbovirus", 5,7) %>% 
+  pack_rows("Malaria", 8,8) %>% 
+  pack_rows("Invasive fungal infection",9,11) %>%
+  pack_rows("Rickettsioses", 12,14) %>%
+  pack_rows("Other", 15,17)
+
+```
+
+
+```{r t3}
+
+# Table of diagnoses stratified by HIV status
+
+BTaetiology %>%
+  select(hivstatus, tb, arbovirus, CrAg_LFA,
+         inv.bacterial, inv.fungal, malaria) %>% 
+  filter(hivstatus != "Unknown") -> t
+
+t[is.na(t)] <- 0
+
+t %>%  
+  pivot_longer(-hivstatus) %>% 
+  group_by(name) %>% 
+  summarise(n.1.reactive = sum(value == 1 & hivstatus == "Reactive"),
+            n.tot.reactive = sum(hivstatus == "Reactive"),
+            n.1.nonreactive = sum(value == 1 & hivstatus == "Non reactive"),
+            n.tot.nonreactive = sum(hivstatus == "Non reactive"),
+            bdiff = list(boot.two.per(value, hivstatus, propz))
+            ) %>% 
+  mutate(diff = map_dbl(bdiff, "Observed"),
+         diff.lci = map_dbl(bdiff, 
+                            function(x) 
+                              unlist((x["Confidence.limits"][[1]][[1]]))),
+          diff.uci = map_dbl(bdiff, 
+                             function(x) 
+                               unlist((x["Confidence.limits"][[1]][[2]]))),
+         react.str = paste0(n.1.reactive, "/", n.tot.reactive,
+                           " (", sp_dc(100*n.1.reactive/ n.tot.reactive,0), 
+                           "%)"),
+         nonreact.str = paste0(n.1.nonreactive, "/", n.tot.nonreactive,
+                           " (", sp_dc(100*n.1.nonreactive/n.tot.nonreactive,0), 
+                           "%)"),
+         diffstr = paste0(sp_dc(diff*100,0), "% (95% CI ",
+                          sp_dc(diff.lci*100,0), "-", 
+                          sp_dc(diff.uci*100,0),")")
+         ) %>% 
+  select(name, react.str, nonreact.str, diffstr) -> tout
+
+tout %>% 
+  mutate(name = recode(name,
+                       tb = "Tuberculosis",
+                       inv.fungal = "Invasive fungal infection",
+                       arbovirus = "Arboviral infection",
+                       inv.bacterial = "Invasive bacterial infection",
+                       malaria = "Malaria")) %>% 
+kbl( col.names = c("Diagnosis", "HIV+", "HIV-", "Difference"),
+ caption = "TABLE 3: Diagnosis stratified by HIV status") %>%
+kable_classic(full_width = FALSE) 
+
+```
+
+```{r st3}
+
+# Table of acute and convalescent serology results
+
+BTsera %>% 
+  select(contains("pid") | starts_with("day_") & 
+           !ends_with("OD") & !ends_with("dilution")) %>%
+  pivot_longer(-pid, 
+               names_to = c("day", "org", "Ig"), 
+               names_pattern = "day_(.*?)_(.*?)_(...)" ) %>%
+  mutate(day = paste0("day ", day)) %>% 
+  group_by(day,org,Ig) %>% 
+  summarise(n_pos = sum(value == "pos", na.rm = TRUE),
+            n_neg = sum(value == "neg" | value == "ind", na.rm = TRUE),
+            n_prev = n_pos/(n_pos+n_neg),
+            n_prev_lci =binom.test(n_pos, n_pos+n_neg)$conf.int[1],
+            n_prev_uci =binom.test(n_pos, n_pos+n_neg)$conf.int[2],
+            prev_str = paste0(n_pos,"/", n_pos + n_neg,
+                                " (",sp_dc(n_prev*100,1), "% [",
+                                sp_dc(n_prev_lci*100,1), "-",
+                                sp_dc(n_prev_uci*100,1),"])"
+                                )
+  ) %>% ungroup() %>%
+  select(day, org, Ig, prev_str) %>%
+  pivot_wider(names_from = c("day","Ig"), 
+              values_from = "prev_str", 
+              values_fill = "&#8722" ) %>%
+  mutate(org = case_when(
+    org == "chik" ~ "Chikungunya",
+    org == "den" ~ "Dengue",
+    org == "lepto" ~ "Leptospirosis",
+    org == "ET" ~ "Epidemic typhus group",
+    org == "SF" ~ "Spotted fever group"
+  )) %>%
+  kbl(
+    caption = "SUPPLEMENTARY TABLE 3: Acute and convalescent serology results", 
+    col.names = c("Organism", "IgG", "IgM", "IgG","IgM"),
+    escape = FALSE) %>%
+  kable_classic(full_width = FALSE) %>%
+  add_header_above(c(" ", "Day 0" = 2, "Day 28" = 2))
+
+```
+
+
+```{r st4}
+
+# Table of differences in variables  between tb or not tb
+# expressed as bootstrapped difference in expressed as median or proportion
+
+BTparticipants %>% 
+  select(-c(hivcpt,ever_tb, tbongoing, art_time,hivonart,
+            d28_death, d90_death, d180_death, t, died, urea)) %>% 
+  left_join(select(BTaetiology, pid, tb )) %>% 
+  mutate(hivstatus = case_when(hivstatus == "Non reactive" ~ "0",
+                               hivstatus == "Reactive" ~ "1",
+                               TRUE ~ NA_character_),
+         ptsex = if_else(ptsex == "Male", "1", "0"),
+         tb = as.character(if_else(is.na(tb), 0,tb))) -> 
+  df.sum.tbl
+
+# bootstrap differences in proportions for character vars
+
+left_join(
+  df.sum.tbl %>% 
+    select(where(is.character)) %>% 
+    select(-pid) %>% 
+    pivot_longer(-tb) %>% 
+    dplyr::group_by(name,tb) %>%
+    summarise(str = paste0(sum(value == 1, na.rm = TRUE), 
+                           " (",
+                           sp_dc(100*sum(value == 1, na.rm = TRUE)/ 
+                                   sum(!is.na(value)),0),
+                           "%)")) %>% 
+    pivot_wider(id_cols = "name", 
+                names_from = "tb",
+                values_from = "str"),
+   
+  df.sum.tbl %>%
+    select(where(is.character)) %>% 
+    select(-pid) %>% 
+    pivot_longer(-tb) %>% 
+    dplyr::group_by(name) %>% 
+  dplyr::summarise(bs = list(boot.two.bca(value, 
+                                          tb, 
+                                          propz))) %>%
+    mutate(diff = map_dbl(bs, "Observed"),
+           diff.lci = map_dbl(bs, 
+                              function(x) unlist(
+                                (x["Confidence.limits"][[1]][[1]]))),
+            diff.uci = map_dbl(bs, 
+                               function(x) unlist(
+                                 (x["Confidence.limits"][[1]][[2]])))) %>% 
+    select(-bs) %>% 
+    mutate(diff.str = paste0(sp_dc(diff *100,0),
+                           "% (", 
+                           sp_dc(diff.lci*100,0),
+                           " to ",
+                           sp_dc(diff.uci*100,0),
+                           "%)")) ,
+  by = "name") ->  diff.in.prop.cat.vars
+
+# bootstrap differences in medians for numeric vars
+
+df.sum.tbl %>% 
+  select(where(is.numeric) | ends_with("tb")) %>% 
+  pivot_longer(-tb) %>%
+  filter(!is.na(tb) & !is.na(value)) %>% 
+  dplyr::group_by(name) %>%
+  dplyr::summarise(bs = list(boot.two.per(value, tb, median))) %>%
+  mutate(diff = map_dbl(bs, "Observed"),
+         diff.lci = map_dbl(bs, 
+                            function(x) 
+                              unlist((x["Confidence.limits"][[1]][[1]]))),
+          diff.uci = map_dbl(bs, 
+                             function(x) 
+                               unlist((x["Confidence.limits"][[1]][[2]])))) %>% 
+  select(-bs) %>% 
+  mutate(diff.str = paste0(sp_dc(diff,1),
+                           " (", 
+                           sp_dc(diff.lci,1),
+                           " to ",
+                           sp_dc(diff.uci,1),
+                           ")"
+                           )
+         )-> diff.in.median.num.vars
+
+
+#summary stats for tb and not tb groups
+
+df.sum.tbl %>% 
+  select(where(is.numeric) | ends_with("tb")) %>%
+  pivot_longer(-tb) %>% filter(!is.na(tb)) %>%
+  dplyr::group_by(name, tb) %>% 
+  dplyr::summarise( median = median(value, na.rm = T),
+                    LQ = quantile(value, 0.25, na.rm = T),
+                    UQ = quantile(value, 0.75, na.rm = T)) %>% 
+  mutate(
+    med_str = paste0(
+      sp_dc(median, 1), " (",
+      sp_dc(LQ, 1), "-",
+      sp_dc(UQ, 1) ,")")
+  ) %>% 
+  select(name, tb, med_str) %>% 
+  pivot_wider(names_from = tb, values_from = med_str) -> 
+  summ.stats.by.group
+
+
+st4 <- merge(summ.stats.by.group, diff.in.median.num.vars, all.x = T)
+
+st4 <- bind_rows(st4,diff.in.prop.cat.vars)
+
+
+st4$boldcol <- FALSE 
+st4$boldcol[(st4$diff.lci >= 0 &
+                st4$diff.uci > 0) | (st4$diff.lci < 0 & 
+                                        st4$diff.uci <= 0)] <- TRUE
+
+
+
+st4[match(c("calc_age", "ptsex", "days_unwell", 
+             "hivstatus", "cd4_absolute", 
+             "screentemp", "t0hr", "t0sbp", "t0dbp", 
+             "t0rr", "t0spo2","gcs", "ustand", 
+             "haemoglobin", "wcc", "platelets", "sodium", 
+             "co2", "creatinine", 
+             "lactate"), st4$name),] -> st4
+
+
+st4<- st4[c("name", "1", "0", "diff.str", "boldcol")]
+names(st4) <- c("Variable", "TB", "no TB", "Difference", "boldcol")
+
+boldrows <- which(st4$boldcol %in% TRUE)
+
+st4$Variable[st4$Variable == "calc_age"] <- "Age (years)"
+st4$Variable[st4$Variable == "ptsex"] <- "Male sex"
+st4$Variable[st4$Variable == "hivstatus"] <- "HIV Infected"
+st4$Variable[st4$Variable == "haemoglobin"] <- "Haemoglobin (x10^9^} g/dL)"
+st4$Variable[st4$Variable == "cd4_absolute"] <- "CD4 count 10^6^ /L"
+st4$Variable[st4$Variable == "screentemp"] <- "Temperature (C)"
+st4$Variable[st4$Variable == "t0hr"] <- "Heart rate (beats/min)"
+st4$Variable[st4$Variable == "t0sbp"] <- "Systolic BP (mmHg)"
+st4$Variable[st4$Variable == "t0dbp"] <- "Diastolic BP (mmHg)"
+st4$Variable[st4$Variable == "t0rr"] <- "Respiratory rate (breaths/min)"
+st4$Variable[st4$Variable == "t0spo2"] <- "Oxygen saturation (%)"
+st4$Variable[st4$Variable == "gcs"] <- "GCS"
+st4$Variable[st4$Variable == "ustand"] <- "Unable to stand"
+st4$Variable[st4$Variable == "lactate"] <- "Lactate (mmol/L)"
+st4$Variable[st4$Variable == "wcc"] <- "White cell count (x10^9^)"
+st4$Variable[st4$Variable == "platelets"] <- "Platelet count (x10^9^ /L)"
+st4$Variable[st4$Variable == "sodium"] <- "Sodium (mmol /L)"
+st4$Variable[st4$Variable == "co2"] <- "Bicarbonate (mmol /L)"
+st4$Variable[st4$Variable == "urea"] <- "Urea (mmol /L)"
+st4$Variable[st4$Variable == "creatinine"] <- "Creatinine (mmol /L)"
+st4$Variable[st4$Variable == "days_unwell"] <- "Length of time unwell for (days)"
+
+
+
+kbl(select(st4,-boldcol), 
+      row.names = F, caption = "SUPPLEMENTARY TABLE 4: Bivariate associations with TB diagnosis. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
+ kable_classic(full_width = FALSE) %>%
+  row_spec(boldrows, bold = T)
+
+
+
+
+
+```
+
+```{r st5 }
+
+# Table of positive tests stratified by HIV status
+
+BTaetiology %>% 
+  mutate(total = 1) %>%
+  select(-c(arbovirus, ricks,
+             tb, inv.bacterial, inv.fungal)) %>%  
+  pivot_longer(-c(hivstatus, pid)) %>% 
+  group_by(hivstatus, name) %>%
+  summarise(pos = as.integer(sum(value,na.rm = TRUE)),
+            tests = sum(!is.na(value)),
+            prop = pos/tests) %>%
+  ungroup() %>%
+  filter(tests> 0) %>%
+  rowwise() %>%
+  mutate(
+    str = case_when(
+      name == "total" ~ as.character(tests),
+      tests == 0 ~ "-",
+      TRUE ~ paste0(pos,"/", tests, " (",
+        sp_dc(100*pos/tests,0), "% [", 
+        sp_dc(100*binom.test(x=pos,n=tests)$conf.int[1],0), "-",
+        sp_dc(100*binom.test(x=pos,n=tests)$conf.int[2],0),"])")
+      )
+    ) %>% 
+  ungroup() %>%
+  select(-c(pos,tests, prop)) %>%
+  pivot_wider(names_from = hivstatus, 
+              values_from = str, 
+              values_fill = "&#8722") %>%
+  arrange(fct_relevel(name, 
+    "total", 
+    "uLAM","Xpert", "mtb bsi",
+    "bsi.bacterial","csf.bacterial","bact_target_pcr",
+    "chik", "dengue",
+    "malaria",
+    "bsi.fungal","csf.fungal","CrAg_LFA",
+    "SF", "ET", 
+    "lepto", "borrelia", "rift_valley_fever")) %>%
+  mutate(name = case_when(
+    name == "bact_target_pcr" ~ "PCR: Bacterial pathogen DNA detected",
+    name == "bsi.bacterial" ~ "Aerobic blood culture",
+    name == "csf.bacterial" ~ "CSF culture",
+    name == "bsi.fungal" ~ "Aerobic blood culture",
+    name == "csf.fungal" ~ "CSF culture",
+    name == "CrAg_LFA" ~ "CSF CrAg",
+    name == "borrelia" ~ "PCR: Borrelia DNA detected",
+    name == "chik" ~ "Chikununya IgM",
+    name == "dengue" ~ "Dengue IgM",
+    name == "ET" ~ "Epidemic typhus group IgM",
+    name == "lepto" ~ "Leptospirosis IgM",
+    name == "malaria" ~ "P. falciparum RDT",
+    name == "rift_valley_fever" ~ "PCR: Rift valley fever virus detected",
+    name == "SF" ~ "Spotted fever group IgM",
+    name == "total" ~ "Number of participants",
+    name == "Xpert" ~ "Sputum Xpert",
+    name == "uLAM" ~ "Urinary LAM lateral flow assay",
+    name == "mtb bsi" ~ "Mycobacterial blood culture"
+  )) %>%
+  kbl(caption = 
+      "SUPPLEMENTARY TABLE 5: Positive test reaults stratified by HIV status",
+      col.names = c("Test", 
+                    "Non reactive",
+                    "Reactive",
+                    "Unknown"),
+      row.names = FALSE,
+      escape = FALSE) %>%
+  kable_classic(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "HIV Status" = 3)) %>%
+  pack_rows("TB diagnostics", 2,4) %>%
+  pack_rows("Bacterial diagnostics", 5,7) %>%
+  pack_rows("Arboviral diagnostics", 8,9) %>%
+  pack_rows("Malaria diagnostics", 10,10) %>%
+  pack_rows("Fungal diagnostics", 11,13) %>%
+  pack_rows("Rickettsial diagnostics",14,15 ) %>% 
+  pack_rows("Leptospirosis diagnostics",16,16 ) %>% 
+  pack_rows("PCR Array card",17,18) %>%
+  footnote(general = 
+             c(str_wrap(paste0("Urinary LAM testing and mycobacterial ",
+             "blood culture testing were only carried out in HIV ", 
+             "infected or HIV unknown participants."), width = 80),
+             "TB = Tuberculosis", "LAM = Lipoaribomannan",
+             "CSF = Cerebrspinal fluid", "CrAg = Cryptoccal antigen"))
+```
+
+
+```{r f1, fig.cap = "FIGURE 1: UpSet plot showing overlapping diagnoses. Only participants who had a diagnosis are included in this plot, and the five most frequent diagnoses shown, demonstrating that most participants had only one diagnosis. Red colour of bar indicates receipt of antibacterial therapy, showing that almost all participants received antibacterial therapy despite no demonstrated invasive bacterial infection in many cases.", fig.height = 5.5, fig.width = 8}
+
+# UpSet plot of diagnoses 
+
+left_join(
+BTaetiology %>% 
+  select(pid, hivstatus, tb, inv.bacterial, 
+         arbovirus, malaria, inv.fungal, 
+         ricks, lepto,
+         borrelia, rift_valley_fever) %>% 
+  rename("Tuberculosis" = tb,
+        "Invasive bacterial infection" = inv.bacterial, 
+        Arbovirus = arbovirus,
+        Malaria = malaria,
+        "Invasive fungal infection" = inv.fungal,
+        "Rickettsioses" = ricks, 
+        "Leptospirosis" = lepto) %>% 
+  as.data.frame,
+  BTtreatment %>% 
+    mutate(abz = !is.na(timeto_ab)) %>% 
+    select(pid, abz)
+) -> d
+
+d[-c(1:2)][is.na(d[-c(1,2)])] <- 0
+
+upset(as.data.frame(d), nsets = 5,order = "freq", text.scale = 1.5,
+      queries = list(
+          list(query = elements, params = list("abz", "TRUE"), 
+               color = viridis_pal( option = "C")(6)[4],
+               active = T, 
+               query.name = "abx"))) -> upsetplot
+
+upsetplot
+# to save - followed by a hacky legend to add
+#jpeg(file = "figures/upset_fig_files/MAIN_upset_diagnoosis.jpeg", width = 8, height = 5.5, 
+#     units = "in", res = 600)
+#upsetplot
+#dev.off()
+#pdf(file = "figures/upset_fig_files/MAIN_upset_diagnoosis.pdf", width = 8, height = 5.5)
+#upsetplot
+
+#dev.off()
+
+#d <- select(d, -abz)
+#mtcars %>% 
+#  ggplot(aes(cyl, fill = disp > 160)) + 
+#  geom_bar() + 
+#  scale_fill_manual(values = c("gray23",viridis_pal( option = "C")(6)[4]),
+#                    labels = c("No antibacterials", 
+#                               "Received antibacterials")) +
+#  theme(legend.title = element_blank()) -> skank
+
+#ggsave("figures/upset_fig_files/hacky_legend_for_upset.pdf", skank)
+
+
+```
+
+```{r sf3, fig.width = 8, fig.height = 3,fig.cap = "Pathogens identified by (A) aerobic blood culture and (B) multiplex PCR on blood. 26 blood cultures in 24/224 participants grew 28 pathogens in total. 26 pathogen PCR targets were identified in 31/122 samples. n here is number of samples."}
+
+# Plot pathogens identified in aerobic blood culture and on array card 
+
+BTbc %>% select(c(typhi, saen, saty, esco,
+                     klpn,hib, stpn, crne,acba,enfam, enfas,stau,prot)) %>% 
+  pivot_longer(everything()) %>% 
+  filter(value != 0) %>% 
+  mutate(name = case_when(
+    name == "typhi" ~ "Salmonella Typhi",
+    name == "saen" ~ "Salmonella Enteritides",
+    name == "esco" ~ "Escherichia coli",
+    name == "saty" ~ "Salmonella Typhimurium",
+    name == "crne" ~ "Cryptococcus neoformans",
+    name == "stau" ~ "Staphylococcus aureus",
+    name == "klpn" ~ "Klebsiella pneumoniae",
+    name == "hib" ~ "Haemophilus influenzae",
+    name == "stpn" ~ "Streptococcus pnemoniae",
+    name == "acba" ~ "Acinetobacter baumannii",
+    name == "enfam" ~ "Enterococcus faecium",
+    name == "prot" ~ "Proteus mirabilis",
+  ),
+  name = fct_rev(fct_infreq(name))) %>% 
+  ggplot(aes(name)) + geom_bar() + coord_flip() + theme_bw() +
+  labs(x = "", y = "n")  +
+  scale_y_continuous(breaks = c(0:10))-> p1
+
+BTarraycard %>% 
+  select(contains("array_")) %>%
+  pivot_longer(everything()) %>%
+  mutate(name = str_replace_all(name, "array_card_", ""),
+         name = str_to_title(name),
+         name = str_replace_all(name, "\\.", " ")) %>% 
+  filter(value == TRUE) %>% 
+  mutate(name = case_when(
+           name == "Ebv" ~ "Epstein-Barr virus",
+           name == "Pan strep" ~ "Streptococcus spp.",
+           name == "Strep pneumo" ~ "Streptococcus pneumoniae",
+           name == "Cmv" ~ "Cytomegalovirus",
+           name == "Dengue" ~ "Dengue virus",
+           name == "Enterobacteria" ~ "Enterobacteria spp.",
+           name == "Pan borrelia" ~ "Borrelia spp.",
+           name == "Rvf" ~ "Rift Valley fever virus",
+           name == "Salmonella hila" ~ "Salmonella spp.",
+           TRUE ~ name
+           )) %>% 
+   mutate(name = fct_rev(fct_infreq(name))) %>% 
+  ggplot(aes(name)) + geom_bar() + coord_flip() + theme_bw()+
+  labs(x = "", y = "n")  +
+  scale_y_continuous(breaks = c(0:10))-> p2
+
+(p1 | p2) + plot_annotation(tag_levels = 'A') -> p
+p
+#ggsave("figures/SUP_BC_PCR_dx.jpg", width = 8, height = 3, units = "in")
+```
+
+
+
+
+```{r sf4, fig.cap = "SUPPLEMENTARY FIGURE 4: number of participants in whom a bacterial pathogen was identified: aggregated (A) and to species level (B). 43 bacterial pathogens were identified in 38 participants. n here is number of participants.", fig.height = 4, fig.width = 10}
+
+# Plot bacterial pathogens identified
+
+BTbc %>% 
+  select(c(pid,typhi, saen, saty, esco,
+           klpn,hib, stpn, crne,
+           acba,enfam, enfas,stau,prot)) %>% 
+  left_join(select(BTparticipants ,pid, hivstatus), by = "pid") %>% 
+  mutate(hivstatus = if_else(is.na(hivstatus), "Unknown", hivstatus)) %>% 
+  left_join(
+    BTarraycard %>% 
+      select(contains("array_") | contains("pid")) %>% 
+      pivot_longer(-pid) %>% 
+      mutate(value = if_else(is.na(value), 0, as.numeric(value))) %>% 
+      pivot_wider(id_cols = pid, 
+                  names_from = name, 
+                  values_from = value),
+    by = c("pid" = "pid")
+  ) %>% 
+  pivot_longer(-c(pid, hivstatus)) %>% 
+  filter(value != 0) %>% 
+  mutate(name = case_when(
+    name == "typhi" ~ "Salmonella Typhi",
+    name == "saen" ~ "Salmonella Enteritides",
+    name == "esco" ~ "Escherichia coli",
+    name == "saty" ~ "Salmonella Typhimurium",
+    name == "crne" ~ "Cryptococcus neoformans",
+    name == "stau" ~ "Staphylococcus aureus",
+    name == "klpn" ~ "Klebsiella pneumoniae",
+    name == "hib" ~ "Haemophilus influenzae",
+    name == "stpn" ~ "Streptococcus pneumoniae",
+    name == "acba" ~ "Acinetobacter baumannii",
+    name == "enfam" ~ "Enterococcus faecium",
+    name == "prot" ~ "Proteus mirabilis",
+    TRUE ~ name
+  )) %>% 
+  mutate(name = str_replace_all(name, "array_card_", ""),
+         name = str_to_title(name),
+         name = str_replace_all(name, "\\.", " ")) %>% 
+  filter(value == TRUE) %>% 
+  mutate(name = case_when(
+           name == "Ebv" ~ "Epstein-Barr virus",
+           name == "Pan strep" ~ "Streptococcus spp.",
+           name == "Strep pneumo" ~ "Streptococcus pneumoniae",
+           name == "Cmv" ~ "Cytomegalovirus",
+           name == "Dengue" ~ "Dengue virus",
+           name == "Enterobacteria" ~ "Enterobacteria spp.",
+           name == "Pan borrelia" ~ "Borrelia spp.",
+           name == "Rvf" ~ "Rift Valley fever virus",
+           name == "Salmonella hila" ~ "Salmonella spp.",
+           TRUE ~ name)) %>%
+  mutate(name = str_to_title(name)) %>% 
+  mutate(group = case_when(
+    str_detect(name, "Escherichia") ~ "Enterobacterales",
+    str_detect(name, "Enterobact") ~ "Enterobacterales",
+    str_detect(name, "Klebsiell") ~ "Enterobacterales",
+    str_detect(name, "Proteus") ~ "Enterobacterales",
+    str_detect(name, "Salmone") ~ "Salmonellae spp.",
+    str_detect(name, "Streptococc") ~ "Streptococci spp.",
+    TRUE ~ "Other"
+   )) %>% 
+  filter(!str_detect(name, "[vV]irus") &
+           !str_detect(name, "Cryptoco")) %>% 
+  mutate(group = str_replace(group, "\\s([A-Z])", tolower)) %>% 
+  mutate(name = str_replace(name, "\\s([A-Z])", tolower)) %>% 
+  mutate(name = str_replace(name, "typhi", "Typhi"),
+         name = str_replace(name, "typhimurium", "Typhimurium")) %>% 
+  unique -> bacteria.by.participant
+
+bacteria.by.participant %>% 
+  mutate(name = fct_rev(fct_infreq(name))) %>% 
+  ggplot(aes(name, fill = hivstatus)) +
+  geom_bar() +
+  coord_flip() +
+  theme_bw() +
+  labs(x = "", y = "n") +
+  scale_y_continuous(breaks = c(0:20)) +
+  labs(fill = "HIV status") +
+  scale_fill_manual(values = viridis_pal()(6)[c(2,4,5)]) -> pb.2#+
+ # scale_fill_viridis_d(option = "D")
+
+bacteria.by.participant %>% 
+  mutate(group = if_else(group == "Enterobacterales",
+                         "non-Salmonella\nEnterobacterales",
+                         group)) %>%  
+  mutate(group = fct_rev(fct_infreq(group))) %>% 
+  ggplot(aes(group, fill = hivstatus)) +
+  geom_bar() +
+  coord_flip() +
+  theme_bw() +
+  labs(x = "", y = "n") +
+  scale_y_continuous(breaks = c(0:20)) +
+  labs(fill = "HIV status") +
+  scale_fill_manual(values = viridis_pal()(6)[c(2,4,5)]) -> pb.1 #+
+  #scale_fill_viridis_d(option = "D")
+
+(pb.1 | pb.2) + 
+  plot_layout(guides = 'collect') + 
+  plot_annotation(tag_levels = "A") -> pb
+
+pb
+
+#ggsave("figures/SUP_bact_pathogens.jpeg", pb, height = 4, width = 10, units = "in")
+
+```
+
+
+```{r sf5, fig.cap = "SUPPLEMENTARY FIGURE 5: Euler diagrm shwoing overlapping diagnoses", fig.height= 4, fig.width=6}
+
+# Euler diagram of overlapping diagnoses
+      
+d$`No diagnosis` = as.numeric(apply(d[-c(1,2)], 1, sum) == 0)
+d$Other <- as.numeric(d$Leptospirosis + d$Rickettsioses + 
+  d$borrelia + d$rift_valley_fever > 0) 
+
+as.ggplot(
+    plot(
+      euler(
+        d %>% 
+          select(-c(pid, hivstatus, borrelia, Leptospirosis, Rickettsioses,
+                    borrelia, rift_valley_fever, Other, abz)) %>% 
+          rename("Bacterial" = "Invasive bacterial infection",
+                 "Fungal" = "Invasive fungal infection") %>% 
+          as.data.frame() 
+      ),
+      fills = list(fill = viridis_pal()(6), alpha = 0.7)
+    )
+) -> p1
+
+
+p1
+#ggsave("figures/MAIN_euler_dx.jpg", width = 6, height =4, units = "in")
+
+```
+
+### Outcome
+
+```{r t4}
+
+# Table of bivariable comparison: survived vs died at 30 days
+# Prepare data frame
+
+BTparticipants %>% 
+  select(-c(d90_death, d180_death, t, died, art_time,
+            hivcpt, ever_tb, tbongoing)) %>% 
+  left_join(BTtreatment %>% 
+              transmute(pid = pid,
+                     tb.rx = !is.na(timeto_antitb),
+                     fung.rx = !is.na(timeto_antifungal),
+                     mal.rx = !is.na(timeto_antimalarial),
+                     time_to_abx = timeto_ab,
+                     fluid.6hr = iv_fluid_6hr)
+  ) %>%
+  left_join(select(BTaetiology, 
+                   pid, 
+                   malaria, 
+                   dengue, 
+                   chik,
+                   arbovirus,
+                   inv.bacterial, 
+                   inv.fungal, 
+                   tb) %>% 
+              mutate(across(!contains("pid"), ~ if_else(is.na(.x), 0, .x)))
+                   ) %>% 
+  mutate(ustand = as.character(ustand),
+         malaria = as.character(malaria),
+         dengue = as.character(dengue),
+         chik = as.character(chik),
+         inv.bacterial = as.character(inv.bacterial),
+         inv.fungal = as.character(inv.fungal),
+         tb = as.character(tb),
+         tb.rx = as.character(as.numeric(tb.rx)),
+         fung.rx = as.character(as.numeric(fung.rx)),
+         mal.rx = as.character(as.numeric(mal.rx)),
+         time_to_abx = as.numeric(time_to_abx),
+         abx = as.character(as.numeric(!is.na(time_to_abx))),
+         fluid.6hr = fluid.6hr /1000,
+         d28_death = as.character(d28_death),
+         ptsex = recode(ptsex,
+                        "Male" = "1",
+                        "Female" = "0"),
+         hivstatus = recode(hivstatus,
+                        "Reactive" = "1",
+                        "Non reactive" = "0",
+                        .default = NA_character_),
+         ) %>% 
+  mutate(no_diagnosis = 1,
+         no_diagnosis = case_when(
+         malaria == 1 ~ 0,
+         dengue == 1 ~ 0,
+         chik == 1 ~ 0,
+         inv.bacterial == 1 ~ 0,
+         inv.fungal ==1 ~ 0,
+         tb == 1 ~ 0,
+         TRUE ~ no_diagnosis),
+         no_diagnosis = as.character(no_diagnosis),
+         tb = if_else(is.na(tb), "0", tb),
+         malaria = if_else(is.na(malaria), "0", malaria),
+         dengue = if_else(is.na(dengue), "0", dengue),
+         chik = if_else(is.na(chik), "0", chik),
+         inv.bacterial = if_else(is.na(inv.bacterial), "0", inv.bacterial),
+         inv.fungal = if_else(is.na(inv.fungal), "0", inv.fungal)) ->
+  BTdata_combined
+
+BTdata_combined %>% 
+  select(-arbovirus) -> df.sum.tbl
+
+
+
+# Make the summary table
+bind_rows(
+# generate summary stats and differences for categorical variables
+  left_join(
+    # Summary stats by groups
+    df.sum.tbl %>% 
+      select(where(is.character)) %>% 
+      select(-pid) %>% 
+      pivot_longer(-d28_death) %>% 
+      filter(!is.na(d28_death)) %>% 
+      dplyr::group_by(name,d28_death) %>%
+      summarise(str = paste0(sum(value == 1, na.rm = TRUE), 
+                             " (",
+                             sp_dc(100*sum(value == 1, na.rm = TRUE)/ 
+                                     sum(!is.na(value)),0),
+                             "%)")) %>% 
+      pivot_wider(id_cols = "name", 
+                  names_from = "d28_death",
+                  values_from = "str"),
+    # Bootstrap difference in proportions 
+    df.sum.tbl %>%
+      select(where(is.character)) %>% 
+      select(-pid) %>% 
+      pivot_longer(-d28_death) %>% 
+      filter(!is.na(d28_death)) %>% 
+      dplyr::group_by(name) %>% 
+    dplyr::summarise(bs = list(boot.two.bca(value, 
+                                            d28_death, 
+                                            propz))) %>%
+      mutate(diff = map_dbl(bs, "Observed"),
+             diff.lci = map_dbl(bs, 
+                                function(x) unlist(
+                                  (x["Confidence.limits"][[1]][[1]]))),
+              diff.uci = map_dbl(bs, 
+                                 function(x) unlist(
+                                   (x["Confidence.limits"][[1]][[2]])))) %>% 
+      select(-bs) %>% 
+      mutate(diff.str = paste0(sp_dc(diff *100,0),
+                             "% (", 
+                             sp_dc(diff.lci*100,0),
+                             " to ",
+                             sp_dc(diff.uci*100,0),
+                             "%)")) ,
+    by = "name"),
+      
+  # for numeric variables
+  left_join(
+    # bootstrap differences
+      df.sum.tbl %>% 
+        select(where(is.numeric) | contains("d28_death")) %>% 
+        pivot_longer(-d28_death) %>%
+        filter(!is.na(d28_death) & !is.na(value)) %>% 
+        dplyr::group_by(name) %>%
+        dplyr::summarise(bs = list(boot.two.per(value, d28_death, median))) %>%
+        mutate(diff = map_dbl(bs, "Observed"),
+               diff.lci = 
+                 map_dbl(
+                   bs,function(x) unlist((x["Confidence.limits"][[1]][[1]]))
+                         ),
+                diff.uci = 
+                 map_dbl(
+                   bs, function(x) unlist((x["Confidence.limits"][[1]][[2]]))
+                   )
+               ) %>% 
+        select(-bs) %>% 
+        mutate(diff.str = paste0(sp_dc(diff,1),
+                             " (", 
+                             sp_dc(diff.lci,1),
+                             " to ",
+                             sp_dc(diff.uci,1),
+                             ")")
+        ),
+      # make summary stats for two groups
+      df.sum.tbl %>% 
+        select(where(is.numeric) | contains("d28_death")) %>%
+        pivot_longer(-d28_death) %>% 
+        filter(!is.na(d28_death)) %>%
+        dplyr::group_by(name, d28_death) %>% 
+        dplyr::summarise( median = median(value, na.rm = T),
+                          LQ = quantile(value, 0.25, na.rm = T),
+                          UQ = quantile(value, 0.75, na.rm = T)) %>% 
+        mutate(med_str = paste0(sp_dc(median, 1), " (",
+                                sp_dc(LQ, 1), "-",
+                                sp_dc(UQ, 1) ,")")) %>% 
+        select(name, d28_death, med_str) %>% 
+        pivot_wider(names_from = d28_death, values_from = med_str) 
+  ) 
+) -> p
+  
+
+
+p$boldcol <- FALSE 
+p$boldcol[(p$diff.lci >= 0 & p$diff.uci > 0) | 
+            (p$diff.lci < 0 & p$diff.uci <= 0)] <- TRUE
+
+
+
+p[match(c("calc_age", "ptsex", "hivstatus", "cd4_absolute", 
+          "haemoglobin","screentemp", "t0hr", "t0sbp", "t0dbp", 
+        "t0rr", "t0spo2","gcs", "ustand", "lactate" , 
+        "wcc", "platelets", "sodium", "co2", "urea", 
+        "creatinine", "inv.bacterial", "tb", "malaria", 
+        "inv.fungal", "chik", "dengue","no_diagnosis",
+        "abx", "time_to_abx", "fung.rx", "mal.rx", "tb.rx",
+        "fluid.6hr"), p$name),] -> p
+
+
+p <- p[c("name", "1", "0", "diff.str", "boldcol")]
+names(p) <- c("Variable", "Died", "Survived", "Difference", "boldcol")
+
+boldrows <- which(p$boldcol %in% TRUE)
+
+p$Variable[p$Variable == "calc_age"] <- "Age (years)"
+p$Variable[p$Variable == "ptsex"] <- "Male sex"
+p$Variable[p$Variable == "hivstatus"] <- "HIV Infected"
+p$Variable[p$Variable == "haemoglobin"] <- "Haemoglobin (x10^9^} g/dL)"
+p$Variable[p$Variable == "cd4_absolute"] <- "CD4 count 10^6^ /L"
+p$Variable[p$Variable == "screentemp"] <- "Temperature (C)"
+p$Variable[p$Variable == "t0hr"] <- "Heart rate (beats/min)"
+p$Variable[p$Variable == "t0sbp"] <- "Systolic BP (mmHg)"
+p$Variable[p$Variable == "t0dbp"] <- "Diastolic BP (mmHg)"
+p$Variable[p$Variable == "t0rr"] <- "Respiratory rate (breaths/min)"
+p$Variable[p$Variable == "t0spo2"] <- "Oxygen saturation (%)"
+p$Variable[p$Variable == "gcs"] <- "GCS"
+p$Variable[p$Variable == "ustand"] <- "Unable to stand"
+p$Variable[p$Variable == "lactate"] <- "Lactate (mmol/L)"
+p$Variable[p$Variable == "wcc"] <- "White cell count (x10^9^)"
+p$Variable[p$Variable == "platelets"] <- "Platelet count (x10^9^ /L)"
+p$Variable[p$Variable == "sodium"] <- "Sodium (mmol /L)"
+p$Variable[p$Variable == "co2"] <- "Bicarbonate (mmol /L)"
+p$Variable[p$Variable == "urea"] <- "Urea (mmol /L)"
+p$Variable[p$Variable == "creatinine"] <- "Creatinine (mmol /L)"
+
+p$Variable[p$Variable == "inv.bacterial"] <- "Invasive bacterial infection"
+p$Variable[p$Variable == "tb"] <- "TB"
+p$Variable[p$Variable == "malaria"] <- "Malaria"
+p$Variable[p$Variable == "inv.fungal"] <- "Invasive fungal infection"
+p$Variable[p$Variable == "chik"] <- "Chikungunya"
+p$Variable[p$Variable == "dengue"] <- "Dengue"
+p$Variable[p$Variable == "no_diagnosis"] <- "No diagnosis"
+
+p$Variable[p$Variable == "abx"] <- "Antibacterials"
+p$Variable[p$Variable == "time_to_abx"] <- "Time to Antibacterials (hr)"
+p$Variable[p$Variable == "fung.rx"] <- "Antifungals"
+p$Variable[p$Variable == "mal.rx"] <- "Antimalarials"
+p$Variable[p$Variable == "tb.rx"] <- "Antimycobacterials"
+
+p$Variable[p$Variable == "fluid.6hr"] <- "IV fluid over 6hr (L)"
+
+
+
+kbl(select(p,-boldcol), 
+      row.names = F, caption = "TABLE 4: Bivariate associations with death by 28 days. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
+ kable_classic(full_width = FALSE) %>%
+  row_spec(boldrows, bold = T) %>%
+  pack_rows("Host Variables", 1,5, bold = F) %>% 
+   pack_rows("Severity Variables", 6, 20, bold = F)  %>%
+    pack_rows("Diagnosis", 21,27, bold = F) %>% 
+   pack_rows("Treatment Received", 28, 33, bold = F) 
+
+
+```
+
+
+
+```{r f2, fig.cap = "FIGURE 2: Kaplan-Meier survival plot showing hazard ratio of death for HIV infected vs noninfected participants from Bayesian cox proportional hazards model with 95% credible intervals.", fig.height=4, fig.width=6}
+
+# KM curve 
+# Models to estimate HR are fit below
+
+psurv2 <- ggsurvplot(
+  survfit(Surv(t,died) ~ hivstatus,
+          data = subset(BTparticipants, !is.na(hivstatus))), 
+          conf.int = F, xlim = c(0, 190), 
+          ylim = (c(0.6,1)), ggtheme = theme_bw(), 
+          size = 0.5, 
+          break.time.by = 30, 
+          pval = "HR 2.0 (95% CrI 1.1-4.0) HIV+ vs HIV-", 
+          pval.coord = c(15,0.65), pval.size = 4
+)
+
+psurv2 <- psurv2$plot
+
+psurv2 + 
+  theme(legend.position = "right", 
+        legend.title = element_blank()) +   
+  scale_color_manual(labels = c("HIV-", "HIV+"), 
+                     values = viridis(6, option = "C")[c(1,4)]) + 
+  labs(x = "Time post enrollment (days)") -> psurv2
+
+psurv2
+#ggsave("figures/MAIN_KM_plot.jpeg", psurv2, width = 6, height = 4)
+
+```
+
+```{r sf6, fig.cap = "SUPPLEMENTARY FIGURE 6: Mortality stratified by diagnosis", fig.width = 5, fig.height = 3}
+
+df.sum.tbl %>% 
+  select(d28_death, malaria,dengue, chik, 
+         inv.bacterial,
+         inv.fungal, tb, no_diagnosis) %>% 
+  pivot_longer(-d28_death) %>% 
+  filter(!is.na(d28_death), value == 1) %>% 
+  group_by(name) %>%
+  mutate(name = recode(name,
+                       tb = "Tuberculosis",
+                       inv.fungal = "Invasive fungal infection",
+                       dengue = "Dengue",
+                       chik = "Chikungunya",
+                       no_diagnosis = "No diagnosis",
+                       inv.bacterial = "Invasive bacterial infection",
+                       malaria = "Malaria"),
+         d28_death = as.numeric(d28_death)) %>% 
+  summarise(mort = sum(d28_death)/ length(d28_death),
+            lci = binom.test(sum(d28_death), 
+                             length(d28_death))$conf.int[1],
+            uci = binom.test(sum(d28_death), 
+                             length(d28_death))$conf.int[2]) %>% 
+  mutate(name = fct_reorder(name, mort)) %>% 
+  ggplot(aes(name,mort, ymin = lci, ymax = uci)) +
+  geom_point() +
+  geom_errorbar(width = 0) +
+  coord_flip() +
+  labs(x = "", y = "Mortality") +
+  theme_bw() -> paetiol
+
+paetiol
+
+#ggsave("figures/SUP_mort_by_dx.jpeg", paetiol, width = 5, height = 3,
+#       units = "in")
+
+```
+
+## Modelling determinents of outcome
+
+### Missing data
+
+Plot missing data priot to imputing missing data with the _mice_ package (below).
+
+```{r sf9, fig.cap = "SUPPLEMENTARY FIGURE 9:Missing data by variable. HIV related variables were not available for HIV-noninfected participants, recorded here as \\'Not done (HIV-)\\'. SpO2 = capilliary oxygen saturation, SBP/DBP = systolic/diastolic blood pressure, RR = respiratory rate, TB = tuberculosis, WCC = white cell count, ART = antiretroviral therapy, CPT = cotrimoxazole preventative therapy.", fig.width  = 6, fig.height = 4}
+
+# Plot missing data
+
+
+BTparticipants %>%
+  select(
+    calc_age,
+    ptsex,
+    hivstatus,
+    cd4_absolute,
+    hivonart,
+    hivcpt,
+    ever_tb,
+    screentemp,
+    t0hr,
+    t0rr,
+    t0sbp,
+    t0dbp,
+    t0spo2,
+    gcs,
+    ustand,
+    days_unwell,
+    haemoglobin,
+    platelets,
+    wcc,
+    sodium,
+    potassium,
+    co2,
+    creatinine,
+    urea,
+    lactate,
+    d28_death,
+    d90_death,
+    d180_death
+  ) %>%
+  rename(
+    Age = calc_age,
+    CD4 = cd4_absolute,
+    Lactate = lactate,
+    Creatinine = creatinine,
+    Urea = urea,
+    Platelets = platelets,
+    SpO2 = t0spo2,
+    SBP = t0sbp,
+    DBP = t0dbp,
+    GCS = gcs,
+    Temperature = screentemp,
+    WCC = wcc,
+    RR = t0rr,
+    Haemoglobin = haemoglobin,
+    HIV_status = hivstatus,
+    Current_ART = hivonart,
+    Taking_CPT = hivcpt,
+    Previous_TB = ever_tb,
+    HR = t0hr,
+    Sex = ptsex,
+    Sodium = sodium,
+    Bicarbonate = co2,
+    Able_to_stand = ustand,
+    Length_of_illness = days_unwell
+  ) %>%
+  mutate(across(
+    matches("ART|CPT|CD4"),
+    ~ case_when(
+      HIV_status == "Non reactive" ~ "Not done (HIV-)",
+      TRUE ~ as.character(.x)
+    )
+  )) %>%
+  mutate(across(
+    everything(),
+    ~
+      case_when(
+        is.na(.x) ~ "Missing",
+        .x == "Not done (HIV-)" ~ "Not done (HIV-)",
+        TRUE ~ "Not missing"
+      )
+  )) %>%
+  pivot_longer(everything()) %>%
+  group_by(name) %>%
+  mutate(sortvar = sum(value == "Not missing")) %>%
+  ggplot(aes(fct_reorder(name, sortvar), fill = value)) +
+  geom_bar() +
+  coord_flip() +
+  scale_fill_manual(values = viridis_pal()(6)[c(2, 4, 5)]) +
+  labs(y = "Number of participants",
+       x = "Variable") +
+  theme_bw() +
+  theme(legend.title = element_blank()) -> p.miss
+
+p.miss
+
+#ggsave( "figures/miss_data.jpg",p.miss, width = 6, height = 4, units = "in")
+
+```
+
+### Transform data and plot correlation matrix
+
+```{r transform, fig.cap = "Density plots of transformed and untransformed variables", fig.height = 7, fig.width = 9}
+
+# Transform variables 
+
+
+BTparticipants %>%
+  select(
+    ustand,
+    calc_age,
+    ptsex,
+    hivstatus,
+    cd4_absolute,
+    haemoglobin,
+    screentemp,
+    t0sbp,
+    t0dbp,
+    t0hr,
+    t0rr,
+    t0spo2,
+    gcs,
+    lactate,
+    wcc,
+    platelets,
+    sodium,
+    co2,
+    creatinine,
+    urea
+  ) %>%
+  mutate(
+    male = if_else(ptsex == "Male", 1, 0),
+    hiv_reactive = case_when(
+      hivstatus == "Reactive" ~ 1,
+      hivstatus == "Non reactive" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    gcs.low = as.numeric(gcs < 15)
+  ) %>%
+  select(-c(ptsex, hivstatus, gcs))  ->
+  df.mod.trans
+df.mod.trans[df.mod.trans== 999] <- NA
+
+
+
+df.mod.trans %>%
+  mutate(
+    calc_age_log = log(calc_age),
+    cd4_absolute_log = log(cd4_absolute),
+    creatinine_log = log(creatinine),
+    lactate_log = log(lactate),
+    plt_log = log(platelets),
+    t0spo2_log = log(101 - t0spo2),
+    t0sbp_log = log(t0sbp),
+    t0dbp_log = log(t0dbp),
+    urea_log = log(urea),
+    screentemp_log = log(41 - screentemp),
+    wcc_log = log(wcc),
+    sodium_log = log(sodium),
+    t0rr_log = log(t0rr)
+  ) -> df.mod.trans
+
+df.mod.trans %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(value)) +
+  geom_density() +
+  facet_wrap( ~ name, scales = "free")
+
+# drop unused vars
+df.mod.trans %>%
+  select(
+    -c(
+      cd4_absolute,
+      creatinine,
+      lactate,
+      platelets,
+      t0spo2,
+      t0sbp,
+      t0dbp,
+      t0rr_log,
+      screentemp,
+      urea,
+      t0dbp,
+      sodium,
+      wcc,
+      calc_age
+    )
+  ) -> df.mod.trans
+
+```
+
+
+```{r correlation-matrix, fig.cap="SUPPLEMENTARY FIGURE 7: Correlation matrix of included continuous variables (using Pearson’s correlation coefficient), row- and column-clustered using hierarchical clustering, showing very strong correlation between creatinine and urea and systolic and diastolic blood pressure. Also note negative correlation (though less strong) between renal failure and thrombocytopenia and low bicarbonate. Plt = Platelet count, WCC= White cell count, HCO3- = serum bicarbonate, SBP = systolic blood pressure, DBP = diastolic blood pressure, Hb = Haemoglobin, CD4 = CD4 cell count, RR = respiratory rate, Na = Serum sodium, Temp = Temperature, SpO2 = Capillary oxygen saturation, HR = Heart rate, Cr = Creatinine. Prefix log_ indicates log transformation of variable.", fig.height = 5, fig.width = 6}
+
+# Generate and plot correlation matrix
+
+df.mod.trans %>%
+  select(-c(ustand,
+            hiv_reactive,
+            gcs.low,
+            male)) %>%
+  dplyr::rename(
+    log_Age = calc_age_log,
+    log_CD4 = cd4_absolute_log,
+    log_Lactate = lactate_log,
+    log_Cr = creatinine_log,
+    log_Plt = plt_log,
+    log_SpO2 = t0spo2_log,
+    log_SBP = t0sbp_log,
+    Temp = screentemp_log,
+    log_WCC = wcc_log,
+    RR = t0rr,
+    Hb = haemoglobin,
+    HR = t0hr,
+    log_Na = sodium_log,
+    `HCO3-` = co2,
+    log_DBP = t0dbp_log,
+    log_Urea = urea_log
+  ) %>%
+  cor(., use = "pairwise") %>%
+  as.data.frame() %>%
+  pheatmap()
+
+#ggsave("figures/SUP_var_correlation_matrix.jpeg", 
+# as.ggplot(p.hm), height = 5, width = 6, units = "in")
+
+
+# rename and drop diastolic blood pressure and urea
+# because strongly correlated with systolic blood pressure and creatinine
+
+df.mod.trans %>%
+  dplyr::rename(
+    Age = calc_age_log,
+    CD4 = cd4_absolute_log,
+    Lactate = lactate_log,
+    Cr = creatinine_log,
+    Plt = plt_log,
+    SpO2 = t0spo2_log,
+    SBP = t0sbp_log,
+    Temp = screentemp_log,
+    WCC = wcc_log,
+    RR = t0rr,
+    Hb = haemoglobin,
+    `HIV+` = hiv_reactive,
+    HR = t0hr,
+    Male = male,
+    `GCS<15` = gcs.low,
+    Na = sodium_log,
+    `HCO3-` = co2,
+    CantStand = ustand
+  ) %>%
+  select(-c(t0dbp_log,
+            urea_log)) ->
+  df.mod.trans
+
+```
+
+
+### Perform PCA
+
+
+```{r pca, fig.cap = "A: Host-severity principal components PC1 and PC2, B: points projected onto PCA space", fig.width = 8, fig.height = 4}
+
+# do PCA
+
+# first prepare full df with all necessary covariates for modelling
+
+# Prepare data frame with all metaadata --------------------------------
+# remember df.mod.trans is all the transformed covariates for PCA
+# BTdata_combined is all data
+
+
+BTparticipants %>%
+  select(-c(
+    d90_death,
+    d180_death,
+    t,
+    died,
+    art_time,
+    hivcpt,
+    ever_tb,
+    tbongoing
+  )) %>%
+  left_join(
+    BTtreatment %>%
+      transmute(
+        pid = pid,
+        tb.rx = !is.na(timeto_antitb),
+        fung.rx = !is.na(timeto_antifungal),
+        mal.rx = !is.na(timeto_antimalarial),
+        time_to_abx = timeto_ab,
+        fluid.6hr = iv_fluid_6hr
+      )
+  ) %>%
+  left_join(
+    select(
+      BTaetiology,
+      pid,
+      malaria,
+      dengue,
+      chik,
+      arbovirus,
+      inv.bacterial,
+      inv.fungal,
+      tb
+    ) %>%
+      mutate(across(!contains("pid"), ~ if_else(is.na(
+        .x
+      ), 0, .x)))
+  ) %>%
+  mutate(
+    ustand = as.character(ustand),
+    malaria = as.character(malaria),
+    dengue = as.character(dengue),
+    chik = as.character(chik),
+    inv.bacterial = as.character(inv.bacterial),
+    inv.fungal = as.character(inv.fungal),
+    tb = as.character(tb),
+    tb.rx = as.character(as.numeric(tb.rx)),
+    fung.rx = as.character(as.numeric(fung.rx)),
+    mal.rx = as.character(as.numeric(mal.rx)),
+    time_to_abx = as.numeric(time_to_abx),
+    abx = as.character(as.numeric(!is.na(time_to_abx))),
+    fluid.6hr = fluid.6hr / 1000,
+    d28_death = as.character(d28_death),
+    ptsex = recode(ptsex,
+                   "Male" = "1",
+                   "Female" = "0"),
+    hivstatus = recode(
+      hivstatus,
+      "Reactive" = "1",
+      "Non reactive" = "0",
+      .default = NA_character_
+    ),
+  ) %>%
+  mutate(
+    no_diagnosis = 1,
+    no_diagnosis = case_when(
+      malaria == 1 ~ 0,
+      dengue == 1 ~ 0,
+      chik == 1 ~ 0,
+      inv.bacterial == 1 ~ 0,
+      inv.fungal == 1 ~ 0,
+      tb == 1 ~ 0,
+      TRUE ~ no_diagnosis
+    ),
+    no_diagnosis = as.character(no_diagnosis),
+    tb = if_else(is.na(tb), "0", tb),
+    malaria = if_else(is.na(malaria), "0", malaria),
+    dengue = if_else(is.na(dengue), "0", dengue),
+    chik = if_else(is.na(chik), "0", chik),
+    inv.bacterial = if_else(is.na(inv.bacterial), "0", inv.bacterial),
+    inv.fungal = if_else(is.na(inv.fungal), "0", inv.fungal)
+  ) ->
+  BTdata_combined
+
+# do PCA -----------------------------------------------------------------
+# on df,mod.trans
+
+prcomp(df.mod.trans[complete.cases(df.mod.trans),],
+       scale = TRUE) -> p
+  p.scores <- as.data.frame(p$scores)
+
+# add in metadata: 28 day death  
+  
+bind_cols(
+  BTdata_combined[complete.cases(df.mod.trans),] %>% 
+    select(d28_death),
+  as.data.frame(p$x)
+) -> p.out
+
+
+
+
+## contribution of different vars to PCA coord  -plot ----------------------- 
+
+
+
+fviz_contrib(p, choice = "var", axes = 1) +
+  theme(plot.title = element_blank()) -> p.cont1
+fviz_contrib(p, choice = "var", axes = 2) +
+  theme(plot.title = element_blank())  -> p.cont2
+fviz_contrib(p, choice = "var", axes = 3) +
+  theme(plot.title = element_blank())  -> p.cont3
+
+ggbiplot_mod(p, circle = TRUE, choices = 3:4) + theme_bw() -> p.pca.3.4
+
+((p.cont1 / p.cont2 / p.cont3) | p.pca.3.4) + 
+  plot_layout(widths = c(1,2)) +
+  plot_annotation(tag_levels  = "A") -> supp.pca.plots
+
+# Points projected onto PCA space
+
+
+p.out %>% 
+  filter(!is.na(d28_death)) %>% 
+  ggplot(aes(PC1, PC2, fill = as.factor(d28_death))) +
+  geom_point(
+    pch = 21,
+    color = "black",
+    size = 3,
+    alpha = 0.3
+  ) +
+  theme_bw() +
+  scale_fill_manual(
+    values = viridis(6, option = "C")[c(1, 4)],
+    labels = c("Survived", "Died"),
+    name = "28 day outcome"
+  ) +
+  geom_vline(aes(xintercept = 0)) +
+  geom_hline(aes(yintercept = 0)) +
+  theme(legend.position = "top") +
+  geom_point(
+    pch = 21,
+    color = "black",
+    size = 3,
+    data =
+      subset(p.out,!is.na(d28_death) & d28_death == 1)
+  ) -> p5
+
+ggbiplot_mod(p, circle = TRUE, labels.size = 1) + 
+  theme_bw() -> p1
+
+(p1  | p5 )  + 
+  plot_annotation(tag_levels = "A") 
+
+```
+
+
+```{r pca2, fig.cap = "SUPPLEMENTARY FIGURE 8: Original host-severity variable contributions to PC1 (A), PC2 (B)  and PC3 (C) and original variables projected onto PC3 and PC4 (D).", fig.width = 8, fig.height = 8  }
+
+supp.pca.plots
+
+```
+
+### Use leave-one-out cross validation to identify number of principal components to take forward for further modelling
+
+```{r loo, warning=FALSE, message = FALSE}
+# set prior
+
+priors <- c(
+  prior(student_t(3, 0, 2.5), class = "Intercept"),
+  prior(student_t(3, 0, 2.5), class = "b")
+)
+
+# Fit Bayesian logistic regression models to predict death using 
+# between 3-5 PC components
+
+brm(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    PC4 + PC5, prior = priors,
+  data = p.out,
+  family = bernoulli(link = "logit"), save_all_pars = TRUE
+)-> b.mod1
+
+b.mod1 <- add_criterion(b.mod1, "loo", moment_match = TRUE,reloo = TRUE)
+
+brm(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    PC4 ,
+  data = p.out, prior = priors,
+  family = bernoulli(link = "logit"), save_all_pars = TRUE
+)-> b.mod2
+
+b.mod2 <- add_criterion(b.mod2, "loo", moment_match = TRUE,reloo = TRUE)
+
+brm(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3,
+  data = p.out, prior = priors,
+  family = bernoulli(link = "logit"), save_all_pars = TRUE
+)-> b.mod3
+
+b.mod3 <- add_criterion(b.mod3, "loo", moment_match = TRUE,reloo = TRUE)
+
+brm(
+  formula = d28_death ~ PC1 +
+    PC2,
+  data = p.out,
+  prior = priors,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+  
+) -> b.mod4
+
+b.mod4 <-
+  add_criterion(b.mod4, "loo", moment_match = TRUE, reloo = TRUE)
+
+loo_compare(b.mod1, b.mod2, b.mod3, b.mod4)
+
+# save model comparison
+#write_rds(b.mod1, "models/b.mod1.RDS")
+#write_rds(b.mod2, "models/b.mod2.RDS")
+#write_rds(b.mod3, "models/b.mod3.RDS")
+#write_rds(b.mod4, "models/b.mod4.RDS")
+#as.data.frame(loo_compare(b.mod1, b.mod2, b.mod3, b.mod4)) -> loo.df
+#loo.df
+#write.csv(loo.df, "tables/SUP_loo_mod_compare_df.csv")
+```
+
+### Impute missing data
+
+```{r impute-missing-data}
+# Scale fluid and time to abx --------------------------------------------
+
+fluid.mean <- mean(BTdata_combined$fluid.6hr, na.rm = TRUE)
+fluid.sd <- sd(BTdata_combined$fluid.6hr, na.rm = TRUE)
+BTdata_combined$fluid.6hr <- (BTdata_combined$fluid.6hr - 
+                                fluid.mean)/fluid.sd
+tta.mean <- mean(BTdata_combined$time_to_abx, na.rm = TRUE)
+tta.sd <- sd(BTdata_combined$time_to_abx, na.rm = TRUE)
+BTdata_combined$time_to_abx <- (BTdata_combined$time_to_abx- 
+                                  tta.mean)/tta.sd
+
+# Prepare datafrane for imputation
+
+bind_cols(
+  df.mod.trans,
+  BTdata_combined %>% 
+    select(
+      d28_death,
+      pid,
+      tb.rx,
+      fung.rx,
+      mal.rx,
+      malaria, 
+      arbovirus, 
+      inv.bacterial, 
+      inv.fungal, 
+      tb,
+      time_to_abx,
+      fluid.6hr)) %>% 
+  mutate(
+    CantStand = as.character(CantStand),
+    `HIV+` = as.factor(`HIV+`),
+    `GCS<15` = as.factor(`GCS<15`),
+    d28_death = as.factor(d28_death),
+    tb = as.numeric(tb),
+    tb = if_else(is.na(tb), 0, tb),
+    malaria = as.numeric(malaria),
+    malaria = if_else(is.na(malaria), 0, malaria),
+    arbovirus = as.numeric(arbovirus),
+    arbovirus = if_else(is.na(arbovirus), 0, arbovirus),
+    inv.bacterial = as.numeric(inv.bacterial),
+    inv.bacterial = if_else(is.na(inv.bacterial), 0, inv.bacterial),
+    inv.fungal = as.numeric(inv.fungal),
+    inv.fungal = if_else(is.na(inv.fungal), 0, inv.fungal),
+  ) %>%
+  dplyr::rename(
+    HIV_pos = `HIV+`,
+    GCS_less15 = `GCS<15`,
+    HCO3 = `HCO3-`
+  ) %>% 
+  as.data.frame() ->
+  df.mod.trans.scale.plus.metadata
+
+# make pred matrix ----------------------------------------------------------
+
+# predict everything from everything else
+
+mice(df.mod.trans.scale.plus.metadata, maxit = 0) -> ini
+pm <- ini$predictorMatrix
+ini$method -> meth
+pm[,(ncol(df.mod.trans) +2):ncol(df.mod.trans.scale.plus.metadata)] <- 0
+pm[(ncol(df.mod.trans) +2):ncol(df.mod.trans.scale.plus.metadata),] <- 0
+meth[(ncol(df.mod.trans) +2):ncol(df.mod.trans.scale.plus.metadata)] <- ""
+df.mod.trans.scale.plus.metadata$time_to_abx <- as.numeric(
+  df.mod.trans.scale.plus.metadata$time_to_abx
+)
+
+# impute missing data --------------------------------------------------------
+
+m <- 10 # number of datasets
+mice(df.mod.trans.scale.plus.metadata, m = m, predictorMatrix = pm,
+     method = meth) -> df.mod.imp
+complete(df.mod.imp, action = "all") -> datasets.imp
+```
+
+### Scale imputed data and project onto PCA coordinates
+
+```{r project-onto-pca}
+# get variables to correct type -----------------------------------------------
+
+lapply(datasets.imp,
+       function(x)
+         x %>% mutate(
+           CantStand = as.numeric(CantStand),
+           HIV_pos = as.numeric(HIV_pos),
+           GCS_less15 = as.numeric(GCS_less15),
+           d28_death = as.numeric(d28_death),
+           d28_death = d28_death - 1,
+           tb = as.factor(tb),
+           tb.rx = as.factor(tb.rx),
+           malaria = as.factor(malaria),
+           inv.fungal = as.factor(inv.fungal)
+         ) %>%
+         as.data.frame) -> datasets.imp
+
+# project onto pca coords ----------------------------------------------------
+
+lapply(datasets.imp,
+       function(x)
+         bind_cols(
+           x,
+           as.data.frame(
+             scale(x[,1:ncol(df.mod.trans)],
+                 p$center, p$scale) %*% p$rotation) 
+         )) -> datasets.imp
+
+# add the mice .imp and .id vars back in -------------------------------------
+
+for (i in 1:m) {
+    datasets.imp[[i]]$.imp <- i
+    datasets.imp[[i]]$.id <- 1:nrow(datasets.imp[[i]])
+  }
+```
+
+### Fit models for antimcrobial therapy
+
+```{r fit-models, warning = FALSE, error = FALSE}
+# fit univariable and then multivariable models -------------------------------
+
+# tb ----------------------------------------------------------------------
+
+# univrariable - diagnosis
+
+brm_multiple(
+  formula = d28_death ~
+    tb,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.tb.unadj
+#write_rds(b.m.tb.unadj, "models/b.m.tb.unadj.RDS")
+
+# univrariable - treatment
+
+brm_multiple(
+  formula = d28_death ~
+    tb.rx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.tb.rx.unadj
+#write_rds(b.m.tb.rx.unadj, "models/b.m.tb.rx.unadj.RDS")
+
+# multivariable
+
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    tb + tb.rx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.tb
+#write_rds(b.m.tb, "models/b.m.tb.final.RDS")
+
+
+#mcmc_intervals_data(b.m.tb, regex_pars = "^b_", 
+#transformations = exp, prob_outer = 0.95)
+
+# malaria --------------------------------------------------------------------
+
+# multivariable 
+
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    malaria + mal.rx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.mal
+#write_rds(b.m.mal, "models/b.m.mal.final.RDS")
+
+# univariable - diagnosis
+
+brm_multiple(
+  formula = d28_death ~
+    malaria,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.mal.univ
+#write_rds(b.m.mal.univ, "models/b.m.mal.univ.RDS")
+
+# univariable - treatment
+
+brm_multiple(
+  formula = d28_death ~
+    mal.rx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.mal.rx.univ
+#write_rds(b.m.mal.rx.univ, "models/b.m.mal.rx.univ.RDS")
+#mcmc_intervals_data(b.m.mal, regex_pars = "^b_",
+#transformations = exp, prob_outer = 0.95)
+
+# invasive fungal ----------------------------------------------------------
+
+# multivariable
+
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    inv.fungal + fung.rx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.fung
+#write_rds(b.m.fung, "models/b.m.fung.final.RDS")
+
+# diagnosis
+
+brm_multiple(
+  formula = d28_death ~
+    inv.fungal,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.fung.univ
+#write_rds(b.m.fung.univ, "models/b.m.fung.univ.RDS")
+
+brm_multiple(
+  formula = d28_death ~ fung.rx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.fung.rx.univ
+#write_rds(b.m.fung.rx.univ, "models/b.m.fung.rx.univ.RDS")
+
+# make output df -----------------------------------------------------------
+
+bind_rows(
+  mcmc_intervals_data(
+    b.mod3,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "_PC")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.tb.unadj,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "tb")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.tb.rx.unadj,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "tb")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.tb,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "tb") |
+             str_detect(parameter, "_PC")) %>%
+    mutate(type = "tb.model",
+           adj = "adjusted"),
+  mcmc_intervals_data(
+    b.m.mal.univ,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "mal")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.mal.rx.univ,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "mal")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.mal,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "mal") |
+             str_detect(parameter, "_PC")) %>%
+    mutate(type = "mal.model",
+           adj = "adjusted"),
+  mcmc_intervals_data(
+    b.m.fung.univ,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "fung")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.fung.rx.univ,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "fung")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(
+    b.m.fung,
+    regex_pars = "^b_",
+    transformations = exp,
+    prob_outer = 0.95
+  ) %>%
+    filter(str_detect(parameter, "fung") |
+             str_detect(parameter, "_PC")) %>%
+    mutate(type = "fung.model",
+           adj = "adjusted")
+  
+) -> df.plot
+
+```
+
+```{r plot-model-outputs, fig.cap = "Unadjusted and adjusted odds ratios for death for antimicrobial treatments.", fig.height = 5, fig.width= 5 }
+
+# Plot effects of antimicrobial treatments
+
+df.plot %>% 
+  filter(!(str_detect(parameter, "_PC") & adj == "adjusted")) %>% 
+  filter((str_detect(parameter, "rx1") | str_detect(parameter, "PC"))) %>% 
+  mutate(parameter =
+           case_when(
+             str_detect(parameter, "fung.rx") ~ "Antifungal",
+             str_detect(parameter, "mal.rx") ~ "Antimalarial",
+             str_detect(parameter, "tb.rx") ~ "Antimtubercular",
+             TRUE ~ str_replace(parameter, "t\\(b_", "")
+           )) %>% 
+  mutate(parameter = str_replace(parameter, "\\)", "")
+  ) %>% 
+  ggplot(aes(parameter, 
+             m, 
+             ymin = ll, 
+             ymax = hh, 
+             color = fct_rev(adj),
+             shape = fct_rev(adj))) + 
+  geom_point(position = position_dodge(width = 0.4)) + 
+  geom_errorbar(width = 0,position = position_dodge(width = 0.4)) + 
+  theme_bw() +
+  geom_hline(aes(yintercept = 1), linetype = "dashed") +
+  labs(y = "OR", x = "Antimicrobial")  +
+  theme(legend.position = "top", 
+        legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_manual(values = c(fill = 
+                                viridis(6, option = "C")[4],
+                                "black")) +
+  scale_shape_manual(values = c(4,16))-> p.effects
+
+p.effects
+```
+
+
+### Fit models for time-to-antibacterials and vlume of IV fluid
+
+```{r tta-and-iv-fluid-models, fig.cap = "Marginal effect of volume of antrvenous fluid (A) and time to antibacterials (B) from nonlinear models", fig.height = 3, fig.width = 7}
+# models for time to antibacterials (linear and restricted cubic spline) ------
+# and IV fluid (linear and restricted cubic spline) ------------------
+
+# time to abx ----------------------------------------------------------
+
+# linear time to abx univariable
+
+brm_multiple(
+  formula = d28_death ~   time_to_abx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.tta.lin.univ
+
+#write_rds(b.m.tta.lin.univ, "models/b.m.tta.lin.univ.RDS")
+#exp(mcmc_intervals_data(b.m.tta.lin.univ,  regex_pars = "^b",
+#                        prob_outer = 0.95)[5:9]/tta.sd)
+
+# linear time to abx corrected for severity/host
+
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    time_to_abx,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.tta.lin
+#write_rds(b.m.tta.lin, "models/b.m.tta.lin.RDS")
+#exp(mcmc_intervals_data(b.m.tta.lin,  regex_pars = "^b",
+#                    prob_outer = 0.95)[5,5:9]/tta.sd)
+
+
+
+# restricted cubic spline time to abx
+# calculate quantiles for knots
+k <- quantile(datasets.imp[[1]]$time_to_abx,
+              c(0.1, 0.5, 0.9),
+              na.rm = TRUE)
+
+# fit
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 +
+    ns(time_to_abx,
+       knots = c(-0.599, -0.418, 1.028)),
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.tta.nonlin
+#write_rds(b.m.tta.nonlin, "models/b.m.tta.nonlin.RDS")
+
+# IV fluid ---------------------------------------------------------- 
+# restricted cubic spine, corrected for severity/host
+
+# get knot locations
+k <- quantile(datasets.imp[[1]]$fluid.6hr,
+              c(0.1, 0.5, 0.9),
+              na.rm = TRUE)
+
+# fit
+
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 + ns(fluid.6hr, knots = c(-1.564, -0.009, 1.410)),
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.fluid
+#write_rds(b.m.fluid, "models/b.m.fluid.RDS")
+
+# linear corrected for severity/host
+
+brm_multiple(
+  formula = d28_death ~ PC1 +
+    PC2  +
+    PC3 + fluid.6hr,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+) -> b.m.fluid.lin
+
+# univariable 
+
+brm_multiple(
+  formula = d28_death ~ fluid.6hr,
+  prior = priors,
+  data = datasets.imp,
+  family = bernoulli(link = "logit"),
+  save_all_pars = TRUE
+  
+) -> b.m.fluid.lin.univ
+
+#write_rds(b.m.fluid.lin, "models/b.m.fluid.lin.RDS")
+#write_rds(b.m.fluid.lin.univ, "models/b.m.fluid.lin.univ.RDS")
+#exp(mcmc_intervals_data(b.m.fluid.lin.univ,  regex_pars = "^b",
+#                        prob_outer = 0.95)[5:9]*1000/fluid.sd)
+#exp(mcmc_intervals_data(b.m.fluid.lin,  regex_pars = "^b",
+#                        prob_outer = 0.95)[5,5:9]*1000/fluid.sd)
+
+# plot marginal effects -----------------------------------------------------
+
+conditional_effects(b.m.tta.nonlin, effects = "time_to_abx") -> tta.ce
+
+tta.ce$time_to_abx %>% 
+  ggplot(aes((time_to_abx+tta.mean/tta.sd)*tta.sd, 
+             estimate__, ymin = lower__, ymax = upper__)) + 
+  geom_line() + 
+  geom_ribbon(alpha = 0.3, fill = viridis(6, option = "C")[4])  + 
+  coord_cartesian(ylim = c(0,0.3), xlim = c(0,50)) + 
+  theme_bw() + labs(x = "Time (hrs) to antibacterial", 
+                    y = "28-day mortality") -> p.tta
+
+conditional_effects(b.m.fluid, effects = "fluid.6hr") -> fluid.ce
+
+fluid.ce$fluid.6hr %>% 
+  ggplot(aes((fluid.6hr+fluid.mean/fluid.sd)*(fluid.sd), 
+             estimate__, ymin = lower__, ymax = upper__)) + geom_line() + 
+  geom_ribbon(alpha = 0.3, fill = viridis(6, option = "C")[4])  + 
+  coord_cartesian(ylim = c(0,0.3)) + 
+  theme_bw() + 
+  labs(x = "Fluid (L) over 6hr", y = "28-day mortality") -> p.fluid
+
+
+(p.fluid | p.tta ) +plot_annotation(tag_levels = "A")
+
+
+```
+
+
+```{r mod-op-tab}
+# Make table of model outputs
+bind_rows(
+  df.plot,
+  mcmc_intervals_data(
+    b.m.tta.lin.univ,
+    regex_pars = "^b_",
+    prob_outer = 0.95
+  ) %>%
+    dplyr::mutate(across(
+      starts_with(c("l", "m", "h")),
+      ~ case_when(parameter == "b_time_to_abx" ~
+                    exp(.x / tta.sd),
+                  TRUE ~ exp(.x))
+    )) %>%
+    filter(str_detect(parameter, "abx") |
+             str_detect(parameter, "_PC")) %>%
+    mutate(type = "unadjusted",
+           adj = "unadjusted"),
+  mcmc_intervals_data(b.m.tta.lin,
+                      regex_pars = "^b_",
+                      prob_outer = 0.95) %>%
+    dplyr::mutate(across(
+      starts_with(c("l", "m", "h")),
+      ~ case_when(parameter == "b_time_to_abx" ~
+                    exp(.x / tta.sd),
+                  TRUE ~ exp(.x))
+    )) %>%
+    filter(str_detect(parameter, "abx") |
+             str_detect(parameter, "_PC")) %>%
+    mutate(type = "tta.model",
+           adj = "adjusted"),
+  mcmc_intervals_data(
+    b.m.fluid.lin.univ,
+    regex_pars = "^b_",
+    prob_outer = 0.95
+  ) %>%
+    dplyr::mutate(across(
+      starts_with(c("l", "m", "h")),
+      ~ case_when(parameter == "b_fluid.6hr" ~
+                    exp(.x / fluid.sd),
+                  TRUE ~ exp(.x))
+    )) %>%
+    filter(str_detect(parameter, "fluid") |
+             str_detect(parameter, "_PC")) %>%
+    dplyr::mutate(type = "unadjusted",
+                  adj = "unadjusted"),
+  mcmc_intervals_data(b.m.fluid.lin,
+                      regex_pars = "^b_",
+                      prob_outer = 0.95) %>%
+    dplyr::mutate(across(
+      starts_with(c("l", "m", "h")),
+      ~ case_when(parameter == "b_fluid.6hr" ~
+                    exp(.x / fluid.sd),
+                  TRUE ~ exp(.x))
+    )) %>%
+    filter(str_detect(parameter, "fluid") |
+             str_detect(parameter, "_PC")) %>%
+    mutate(type = "fluid.model",
+           adj = "adjusted")
+) ->
+  df.plot
+
+
+df.plot %>%
+  mutate(parm_string = paste0(sp_dc(m, 2), " (", sp_dc(ll, 2),
+                              "-", sp_dc(hh, 2), ")")) %>%
+  mutate(parameter = str_replace(parameter, "t\\(b_|b_", "")) %>%
+  mutate(
+    parameter = str_replace(parameter, "\\)", "")
+    ) %>% 
+  select(parameter, parm_string, type, adj) %>%
+  pivot_wider(
+    id_cols = parameter,
+    names_from = c(type, adj),
+    values_from = parm_string
+  ) -> mod.output.tab
+
+
+mod.output.tab %>% 
+  dplyr::mutate(
+    parameter = dplyr::recode(
+      parameter,
+      tb1 = "Diagnosis is TB",
+      tb.rx1 = "Received TB treatment",
+      malaria1 = "Diagnosis is malaria",
+      mal.rx1 = "Received malaria treatment",
+      inv.fungal1 =
+        "Diagnosis is invasive fungal disease",
+      fung.rx1 = "Recieved antifungal",
+      time_to_abx = "Time to antibacterial therapy (per hour)",
+      fluid.6hr = "Vol of IV fluid (L)"
+    )
+  ) %>%
+  dplyr::rename(
+    "Unadjusted" = "unadjusted_unadjusted",
+    "TB treatment" = "tb.model_adjusted",
+    "Malaria treatment" = "mal.model_adjusted",
+    "Fungal treatment" = "fung.model_adjusted",
+    "Time to antibacterial" = "tta.model_adjusted",
+    "Vol of IV fluid" = "fluid.model_adjusted"
+  ) %>%
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::everything(),
+      ~ if_else(is.na(.x), "-", .x)
+      )
+    ) -> mod.output.tab
+
+kbl(mod.output.tab,
+    row.names = F, caption = "SUPPLEMENTARY TABLE 7: Parameter estimates from models assessing effect of therapies on mortality, expressed as adjusted odds ratios with a point estimate (posterior median) and 95% credible intervals.") %>%
+  kable_classic(full_width = FALSE)
+
+#write_csv(mod.output.tab, "tables/SUP_mort_models_table.csv")
+```
+
+
+
+```{r fig2, fig.cap = "FIGURE 3: A: Host-severity principal components 1 and 2 showing that PC1 defines an axis of HIV, immunosuppression (low CD4 count and anaemia) and shock (tachycardia, low blood pressre and bicarbonate) whereas PC2 is associated with sepsis-related organ dysfunction,  age, and male sex. B: Participants projected onto PC1 and 2 showing that participants who die (red circles) tend to have immunosuppression and shock (upper right), other sepsis related organ dysfunction (lower left), or both (lower right). C-E: Outputs of models predicting death by 28 days. Adjusted odds ratios and 95% credible intervals of effect of different antimicrobial therapies (C), predicted mortality as a function of time to antibacterial therapy (D) or volume of intravenous fluid received (E).", fig.width=8, fig.height=8 }
+
+# (1,2) PCA var plot and final mort plot  ------------------------------------
+
+
+(p1  | p5 ) / (p.effects | p.tta | p.fluid) + 
+  plot_annotation(tag_levels = "A") + 
+  plot_layout(heights = c(2,1)) -> mort.model.plot.final
+
+mort.model.plot.final
+
+#ggsave( "figures/MAIN_mort_model.plot.jpeg",
+#        mort.model.plot.final, 
+#        width = 8, height = 8, units = "in")
+
+```
