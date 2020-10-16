@@ -63,3 +63,7 @@ definitions access the associated help file (e.g via `?BTparticipants`)
 This analysis is available as a package vignette by typing
 `vignette("analysis")` and the code is accessed either via the
 associated .Rmd file or by typing `edit(vigentte("analysis"))`.
+
+The [pkgdown](https://joelewis101.github.io/blantyreSepsis/) site for
+this package has a rendered version of the analysis script as well as
+variable definitions for the datasets.
