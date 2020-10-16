@@ -1,16 +1,28 @@
 Package: blantyreSepsis
-Title: What the Package Does (One Line, Title Case)
+Title: Data and code for analysis of sepsis aetiology and outcome in Blantyre, Malawi 
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "First",
-           family = "Last",
+    person(given = "Joe",
+           family = "Lewis",
            role = c("aut", "cre"),
-           email = "first.last@example.com",
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to
-    pick a license
+           email = "joseph.lewis@lstmed.ac.uk",
+           comment = c(ORCID = "0000-0002-3837-5188"))
+Description: Data and code for to replicate the analsyis of sepsis aetiology an outcome in Lewis et al 2020.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
+Depends: 
+    R (>= 2.10)
+Imports:
+    plyr,
+    dplyr,
+    stats,
+    ggplot2,
+    scales,
+    grid
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
