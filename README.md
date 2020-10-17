@@ -73,7 +73,8 @@ and the code is accessed by typing `edit(vigentte("analysis"))`. Be
 warned: building the vignette takes some time as it will run through the
 full missing data imputation and model fitting\!
 
-Alternatively the source code for the vignette is `analysis.Rmd` or the
+Alternatively the source code for the vignette is `analysis.Rmd` in the
+`vignettes/` folder of this repo or the
 [pkgdown](https://joelewis101.github.io/blantyreSepsis/) site for this
 package has a rendered version, as well as variable definitions for the
 datasets.
