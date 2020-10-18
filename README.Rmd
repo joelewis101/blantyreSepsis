@@ -26,7 +26,7 @@ The BlantyreSepsis R package contains data and code to replicate the analysis of
 
 <br />
 
-Joseph M Lewis^1,2,3^, , Madlatso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Brian Faragher^2^, Melita Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
+Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Brian Faragher^2^, Melita Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
 
 1. Malawi Liverpool Wellcome Clinical Research Programme, Blantyre, Malawi
 2. Department of Clinical Sciences, Liverpool School of Tropical Medicine, Liverpool, UK

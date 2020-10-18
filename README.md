@@ -17,7 +17,7 @@ centre: an observational cohort study*
 
 <br />
 
-Joseph M Lewis<sup>1,2,3</sup>, , Madlatso Mphasa<sup>1</sup>, Lucy
+Joseph M Lewis<sup>1,2,3</sup>, , Madalitso Mphasa<sup>1</sup>, Lucy
 Keyala<sup>1</sup>, Rachel Banda<sup>1</sup>, Emma
 Smith<sup>1</sup>,<sup>2</sup>, Jackie Duggan<sup>4</sup>, Tim
 Brooks<sup>4</sup>, Matthew Catton<sup>4</sup>, Jane
