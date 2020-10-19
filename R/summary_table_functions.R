@@ -5,11 +5,11 @@ median_iqr_str <- function(x, r= 0) {
   # r is digits to round to
   if (!is.numeric(x)) {stop("Nonnumeric value in median_iqr_str.")}
   out_str <- paste0(
-    format(round(median(x, na.rm =T), r), nsmall = r),
+    format(round(stats::median(x, na.rm =T), r), nsmall = r),
     " (",
-    format(round(quantile(x, 0.25, na.rm = T)[[1]], r), nsmall = r),
+    format(round(stats::quantile(x, 0.25, na.rm = T)[[1]], r), nsmall = r),
     "-",
-    format(round(quantile(x, 0.75, na.rm = T)[[1]], r), nsmall = r),
+    format(round(stats::quantile(x, 0.75, na.rm = T)[[1]], r), nsmall = r),
     ")"
   )
   return(out_str)
@@ -38,9 +38,9 @@ prop_str <- function(x, r= 0, confint = TRUE) {
                          format(round((n*100/N), r), nsmall = r),
                          ifelse(confint,
                                 paste0("% [",
-                                format(round(binom.test(n,N)$conf.int[[1]] * 100, r), nsmall = r),
+                                format(round(stats::binom.test(n,N)$conf.int[[1]] * 100, r), nsmall = r),
                                 "-",
-                                format(round(binom.test(n,N)$conf.int[[2]] * 100, r), nsmall = r),
+                                format(round(stats::binom.test(n,N)$conf.int[[2]] * 100, r), nsmall = r),
                                 "%])"),
                                 "%)"
                          )
@@ -96,9 +96,9 @@ prop_confint_str <- function(x, r= 0) {
     format(round((n*100/N), r), nsmall = r),
     "% ",
     " (",
-    format(round(binom.test(n,N)$conf.int[[1]] * 100, r), nsmall = r),
+    format(round(stats::binom.test(n,N)$conf.int[[1]] * 100, r), nsmall = r),
     "-",
-    format(round(binom.test(n,N)$conf.int[[2]] * 100, r), nsmall = r),
+    format(round(stats::binom.test(n,N)$conf.int[[2]] * 100, r), nsmall = r),
     "%)"
   )
   return(out_str)

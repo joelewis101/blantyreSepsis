@@ -55,6 +55,8 @@ ggbiplot_mod(
 
 \item{circle}{draw a correlation circle? (only applies when prcomp was called with scale = TRUE and when var.scale = 1)}
 
+\item{circle.prob}{cirle param}
+
 \item{varname.size}{size of the text for variable names}
 
 \item{varname.adjust}{adjustment factor the placement of the variable names, >= 1 means farther from the arrow}
