@@ -76,11 +76,11 @@
 <a href="#blantyresepsis" class="anchor"></a>blantyreSepsis</h1></div>
 <!-- badges: start -->
 <!-- badges: end -->
-<p>The BlantyreSepsis R package contains contains data code to replicate the analysis of the manuscript:</p>
+<p>The BlantyreSepsis R package contains data and code to replicate the analysis of the manuscript:</p>
 <p><br></p>
 <p><em>Aetiology and determinants of outcome in sepsis in an urban African centre: an observational cohort study</em></p>
 <p><br></p>
-<p>Joseph M Lewis<sup>1,2,3</sup>, , Madlitso Mphasa<sup>1</sup>, Lucy Keyala<sup>1</sup>, Rachel Banda^1, Emma Smith<sup>1</sup>,<sup>2</sup>, Jackie Duggan<sup>4</sup>, Tim Brooks<sup>4</sup>, Matthew Catton<sup>4</sup>, Jane Mallewa<sup>5</sup>, Grace Katha<sup>5</sup>, Brian Faragher<sup>2</sup>, Melita Gordon<sup>1,3</sup>, Jamie Rylance<sup>1,2</sup>, Nicholas A Feasey<sup>1,2</sup></p>
+<p>Joseph M Lewis<sup>1,2,3</sup>, , Madalitso Mphasa<sup>1</sup>, Lucy Keyala<sup>1</sup>, Rachel Banda<sup>1</sup>, Emma Smith<sup>1</sup>,<sup>2</sup>, Jackie Duggan<sup>4</sup>, Tim Brooks<sup>4</sup>, Matthew Catton<sup>4</sup>, Jane Mallewa<sup>5</sup>, Grace Katha<sup>5</sup>, Brian Faragher<sup>2</sup>, Melita Gordon<sup>1,3</sup>, Jamie Rylance<sup>1,2</sup>, Nicholas A Feasey<sup>1,2</sup></p>
 <ol>
 <li>Malawi Liverpool Wellcome Clinical Research Programme, Blantyre, Malawi</li>
 <li>Department of Clinical Sciences, Liverpool School of Tropical Medicine, Liverpool, UK</li>
@@ -94,7 +94,7 @@
 <p>Install the package from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit">
 <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span>
-<span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org//reference/remote-reexports.html">install_github</a></span><span class="op">(</span><span class="st">"joelewis101/blantreSepsis"</span><span class="op">)</span></pre></div>
+<span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org//reference/remote-reexports.html">install_github</a></span><span class="op">(</span><span class="st">"https://github.com/joelewis101/blantyreSepsis"</span><span class="op">)</span></pre></div>
 <p>Or check out the source code at <a href="https://github.com/joelewis101/blantyreSepsis">GitHub</a></p>
 <p>Six datasets are included in the package; for details and variable definitions access the associated help file (e.g via <code><a href="reference/BTparticipants.html">?BTparticipants</a></code>)</p>
 <ul>
@@ -111,7 +111,11 @@
 <li>
 <code>BTbc</code> - Results of aerobic blood culture</li>
 </ul>
-<p>This analysis is available as a package vignette by typing <code><a href="articles/analysis.html">vignette("analysis")</a></code> and the code is accessed either via the associated .Rmd file or by typing <code><a href="https://rdrr.io/r/utils/edit.html">edit(vigentte("analysis"))</a></code>.</p>
+<p>This analysis is available as a package vignette; this can be built when downloading the package by typing:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit">
+<span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org//reference/remote-reexports.html">install_github</a></span><span class="op">(</span><span class="st">"https://github.com/joelewis101/blantyreSepsis"</span>, build_vignettes <span class="op">=</span> <span class="cn">TRUE</span> <span class="op">)</span></pre></div>
+<p>The vignette will be then be available by typing <code><a href="articles/analysis.html">vignette("analysis")</a></code> and the code is accessed by typing <code><a href="https://rdrr.io/r/utils/edit.html">edit(vigentte("analysis"))</a></code>. Be warned: building the vignette takes some time as it will run through the full missing data imputation and model fitting!</p>
+<p>Alternatively the source code for the vignette is <code>analysis.Rmd</code> in the <code>vignettes/</code> folder of this repo or the <a href="https://joelewis101.github.io/blantyreSepsis/">pkgdown</a> site for this package has a rendered version, as well as variable definitions for the datasets.</p>
 </div>
 </div>
   </div>
