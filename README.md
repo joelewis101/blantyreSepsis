@@ -21,9 +21,10 @@ Joseph M Lewis<sup>1,2,3</sup>, , Madalitso Mphasa<sup>1</sup>, Lucy
 Keyala<sup>1</sup>, Rachel Banda<sup>1</sup>, Emma
 Smith<sup>1</sup>,<sup>2</sup>, Jackie Duggan<sup>4</sup>, Tim
 Brooks<sup>4</sup>, Matthew Catton<sup>4</sup>, Jane
-Mallewa<sup>5</sup>, Grace Katha<sup>5</sup>, Brian
-Faragher<sup>2</sup>, Melita Gordon<sup>1,3</sup>, Jamie
-Rylance<sup>1,2</sup>, Nicholas A Feasey<sup>1,2</sup>
+Mallewa<sup>5</sup>, Grace Katha<sup>5</sup>, Stephen B
+Gordon<sup>1,2</sup>, Brian Faragher<sup>2</sup>, Melita A
+Gordon<sup>1,3</sup>, Jamie Rylance<sup>1,2</sup>, Nicholas A
+Feasey<sup>1,2</sup>
 
 1.  Malawi Liverpool Wellcome Clinical Research Programme, Blantyre,
     Malawi
@@ -32,7 +33,7 @@ Rylance<sup>1,2</sup>, Nicholas A Feasey<sup>1,2</sup>
 3.  Department of Clinical Infection, Microbiology and Immunology,
     University of Liverpool, Liverpool, UK
 4.  Rare and Imported Pathogens Laboratory, Public Health England, UK
-5.  Malawi College of Medicine, University of Malawi
+5.  College of Medicine, University of Malawi, Malawi
 
 ## Installing and accessing data
 
@@ -47,7 +48,8 @@ Or check out the source code at
 [GitHub](https://github.com/joelewis101/blantyreSepsis)
 
 Six datasets are included in the package; for details and variable
-definitions access the associated help file (e.g via `?BTparticipants`)
+definitions access the associated help file (e.g via `?BTparticipants`).
+They are lazy loaded so will be available on loading the package.
 
   - `BTparticipants` - Baseline characteristics and investigation
     results for included participants

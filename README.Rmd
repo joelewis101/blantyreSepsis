@@ -26,13 +26,13 @@ The BlantyreSepsis R package contains data and code to replicate the analysis of
 
 <br />
 
-Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Brian Faragher^2^, Melita Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
+Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Stephen B Gordon^1,2^, Brian Faragher^2^, Melita A Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
 
 1. Malawi Liverpool Wellcome Clinical Research Programme, Blantyre, Malawi
 2. Department of Clinical Sciences, Liverpool School of Tropical Medicine, Liverpool, UK
 3. Department of Clinical Infection, Microbiology and Immunology, University of Liverpool, Liverpool, UK
 4. Rare and Imported Pathogens Laboratory, Public Health England, UK
-5. Malawi College of Medicine, University of Malawi
+5. College of Medicine, University of Malawi, Malawi
 
 ## Installing and accessing data
 
@@ -45,7 +45,7 @@ devtools::install_github("https://github.com/joelewis101/blantyreSepsis")
 
 Or check out the source code at [GitHub](https://github.com/joelewis101/blantyreSepsis) 
 
-Six datasets are included in the package; for details and variable definitions access the associated help file (e.g via `?BTparticipants`)
+Six datasets are included in the package; for details and variable definitions access the associated help file (e.g via `?BTparticipants`). They are lazy loaded so will be available on loading the package.
 
 * `BTparticipants` - Baseline characteristics and investigation results for included participants
 * `BTtreatments` - Antimicrobial therapy and intravenous fluid therapy received by included participants
