@@ -1,6 +1,6 @@
 Package: blantyreSepsis
 Title: Data and code for analysis of sepsis aetiology and outcome in Blantyre, Malawi 
-Version: 0.0.0.9000
+Version: 1.0.0.0000
 Authors@R: 
     person(given = "Joe",
            family = "Lewis",
