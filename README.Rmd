@@ -22,7 +22,7 @@ The BlantyreSepsis R package contains data and code to replicate the analysis of
   
 <br />
 
-*Aetiology and determinants of outcome in sepsis in an urban African centre: an observational cohort study*
+*Aetiology, determinants of mortality and long-term outcomes of sepsis in Malawi*
 
 <br />
 

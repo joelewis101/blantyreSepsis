@@ -12,8 +12,8 @@ analysis of the manuscript:
 
 <br />
 
-*Aetiology and determinants of outcome in sepsis in an urban African
-centre: an observational cohort study*
+*Aetiology, determinants of mortality and long-term outcomes of sepsis
+in Malawi*
 
 <br />
 
