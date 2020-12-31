@@ -1,5 +1,5 @@
 ---
-title: "Aetiology and determinants of outcome in sepsis in an urban african centre: an observational cohort study"
+title: "Aetiology, determinants of mortality and long-term outcomes of sepsis in Malawi"
 subtitle: "Reproducible analysis code"
 author: |
   | Joe Lewis
@@ -24,7 +24,7 @@ The BlantyreSepsis R package contains contains data code to replicate the analys
   
 <br />
 
-*Aetiology and determinants of outcome in sepsis in an urban African centre: an observational cohort study*
+*Aetiology and determinants of mortality and long-term outcomes of sepsis in Malawi*
 
 <br />
 
@@ -120,7 +120,7 @@ propz <- function(dat) {
 
 ### Demographics of included patients
 
-```{r t1}
+```{r t2}
 
 # Table of demographics
 
@@ -230,7 +230,7 @@ BTparticipants %>%
 t1 %>%
   select(-variable) %>%
   kbl(col.names = c("Variable", "Value"),
-   caption = "TABLE 1: baseline characteristics of included participants") %>%
+   caption = "TABLE 2: baseline characteristics of included participants") %>%
   kable_classic(full_width = FALSE) %>%
   pack_rows(index = make_kable_rowgroup_string(t1, variable)) %>% 
   footnote(symbol  = c("HIV status missing for 12 participants"))
@@ -313,7 +313,7 @@ t2 %>%
 ### Aetiology
 
 
-```{r t2}
+```{r t3}
 
 # Table of aetiology
 
@@ -384,7 +384,7 @@ BTaetiology %>%
   dplyr::select(name, positive_tests, positive_tests_prop,positive_tests_prop_ci, 
          prevalence, prevalence_prop, prevalence_prop_ci) %>% 
   kbl(caption = 
-        "TABLE 2: Positive diagnostic tests and minimum disease prevalence.",
+        "TABLE 3: Diagnoses in study participants and proportion of participants with positive results.",
       col.names = c("Diagnosis", 
                     "n/N",
                     "%",
@@ -398,7 +398,7 @@ BTaetiology %>%
   #add_indent(c(1,4,7,10,11,14,15,16,17), level_of_indent = -1) %>%
  # row_spec(c(2,3,5,6,9,10,12,13), italic = TRUE) %>%
   add_header_above(c(" ", "Proportion of paricipants with positive result" = 3,
-                     "Cohort minimum prevalence" = 3)) %>% 
+                     "Cohort prevalence" = 3)) %>% 
   pack_rows("Tuberculosis",1,1) %>%
   pack_rows("Invasive bacterial infection",2,4) %>%
   pack_rows("Arbovirus", 5,7) %>% 
@@ -410,12 +410,12 @@ BTaetiology %>%
 ```
 
 
-```{r t3}
+```{r t4}
 
 # Table of diagnoses stratified by HIV status
 
 BTaetiology %>%
-  select(hivstatus, tb, arbovirus, CrAg_LFA,
+  select(hivstatus, tb, arbovirus,
          inv.bacterial, inv.fungal, malaria) %>% 
   filter(hivstatus != "Unknown") -> t
 
@@ -457,7 +457,7 @@ tout %>%
                        inv.bacterial = "Invasive bacterial infection",
                        malaria = "Malaria")) %>% 
 kbl( col.names = c("Diagnosis", "HIV+", "HIV-", "Difference"),
- caption = "TABLE 3: Diagnosis stratified by HIV status") %>%
+ caption = "TABLE 4: Diagnosis stratified by HIV status") %>%
 kable_classic(full_width = FALSE) 
 
 ```
@@ -814,7 +814,7 @@ upsetplot
 
 ```
 
-```{r sf3, fig.width = 8, fig.height = 3,fig.cap = "Pathogens identified by (A) aerobic blood culture and (B) multiplex PCR on blood. 26 blood cultures in 24/224 participants grew 28 pathogens in total. 26 pathogen PCR targets were identified in 31/122 samples. n here is number of samples."}
+```{r sf3, fig.width = 8, fig.height = 3,fig.cap = "SUPPLEMENTARY FIGURE 3: Pathogens identified by (A) aerobic blood culture and (B) multiplex PCR on blood. 26 blood cultures in 24/224 participants grew 28 pathogens in total. 26 pathogen PCR targets were identified in 31/122 samples. n here is number of samples."}
 
 # Plot pathogens identified in aerobic blood culture and on array card 
 
@@ -1011,7 +1011,7 @@ p1
 
 ### Outcome
 
-```{r t4}
+```{r t5}
 
 # Table of bivariable comparison: survived vs died at 30 days
 # Prepare data frame
@@ -1235,7 +1235,7 @@ p$Variable[p$Variable == "fluid.6hr"] <- "IV fluid over 6hr (L)"
 
 
 kbl(select(p,-boldcol), 
-      row.names = F, caption = "TABLE 4: Bivariate associations with death by 28 days. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
+      row.names = F, caption = "TABLE 5: Bivariate associations with death by 28 days. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
  kable_classic(full_width = FALSE) %>%
   row_spec(boldrows, bold = T) %>%
   pack_rows("Host Variables", 1,5, bold = F) %>% 
@@ -1337,7 +1337,7 @@ paetiol
 
 Plot missing data priot to imputing missing data with the _mice_ package (below).
 
-```{r sf9, fig.cap = "SUPPLEMENTARY FIGURE 9:Missing data by variable. HIV related variables were not available for HIV-noninfected participants, recorded here as \\'Not done (HIV-)\\'. SpO2 = capilliary oxygen saturation, SBP/DBP = systolic/diastolic blood pressure, RR = respiratory rate, TB = tuberculosis, WCC = white cell count, ART = antiretroviral therapy, CPT = cotrimoxazole preventative therapy.", fig.width  = 6, fig.height = 4}
+```{r sf9, fig.cap = "SUPPLEMENTARY FIGURE 9: Missing data by variable. HIV related variables were not available for HIV-noninfected participants, recorded here as \\'Not done (HIV-)\\'. SpO2 = capilliary oxygen saturation, SBP/DBP = systolic/diastolic blood pressure, RR = respiratory rate, TB = tuberculosis, WCC = white cell count, ART = antiretroviral therapy, CPT = cotrimoxazole preventative therapy.", fig.width  = 6, fig.height = 4}
 
 # Plot missing data
 
