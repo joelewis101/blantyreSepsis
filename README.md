@@ -4,7 +4,6 @@
 # blantyreSepsis
 
 <!-- badges: start -->
-
 <!-- badges: end -->
 
 The BlantyreSepsis R package contains data and code to replicate the
@@ -12,8 +11,9 @@ analysis of the manuscript:
 
 <br />
 
-*Aetiology, determinants of mortality and long-term outcomes of sepsis
-in Malawi*
+*A longitudinal observational study of the aetiology and long-term
+outcomes of sepsis in Malawi reveals a key role of HIV and disseminated
+tuberculosis*
 
 <br />
 
@@ -51,17 +51,17 @@ Six datasets are included in the package; for details and variable
 definitions access the associated help file (e.g via `?BTparticipants`).
 They are lazy loaded so will be available on loading the package.
 
-  - `BTparticipants` - Baseline characteristics and investigation
+-   `BTparticipants` - Baseline characteristics and investigation
     results for included participants
-  - `BTtreatments` - Antimicrobial therapy and intravenous fluid therapy
+-   `BTtreatments` - Antimicrobial therapy and intravenous fluid therapy
     received by included participants
-  - `BTaetiology` - Results of malaria testing, aerobic blood culture,
+-   `BTaetiology` - Results of malaria testing, aerobic blood culture,
     cerebrospinalfluid culture, tuberculosis diagnostic tests
-  - `BTsera` - Results of serologic tests for arboviruses,
+-   `BTsera` - Results of serologic tests for arboviruses,
     Rickettsioses, Leptospirosis
-  - `BTarraycard` - Results of multiplex PCR test for high consequence
+-   `BTarraycard` - Results of multiplex PCR test for high consequence
     pathogens
-  - `BTbc` - Results of aerobic blood culture
+-   `BTbc` - Results of aerobic blood culture
 
 This analysis is available as a package vignette; this can be built when
 downloading the package by typing:
@@ -73,7 +73,7 @@ devtools::install_github("https://github.com/joelewis101/blantyreSepsis", build_
 The vignette will be then be available by typing `vignette("analysis")`
 and the code is accessed by typing `edit(vigentte("analysis"))`. Be
 warned: building the vignette takes some time as it will run through the
-full missing data imputation and model fitting\!
+full missing data imputation and model fitting!
 
 Alternatively the source code for the vignette is `analysis.Rmd` in the
 `vignettes/` folder of this repo or the

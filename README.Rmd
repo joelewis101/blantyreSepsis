@@ -22,7 +22,7 @@ The BlantyreSepsis R package contains data and code to replicate the analysis of
   
 <br />
 
-*Aetiology, determinants of mortality and long-term outcomes of sepsis in Malawi*
+*A longitudinal observational study of the aetiology and long-term outcomes of sepsis in Malawi reveals a key role of HIV and disseminated tuberculosis*
 
 <br />
 
