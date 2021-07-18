@@ -1,6 +1,5 @@
 ---
-title: "Aetiology, determinants of mortality and long-term outcomes of sepsis in Malawi"
-subtitle: "Reproducible analysis code"
+title: "Reproducible analysis"
 author: |
   | Joe Lewis
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -24,11 +23,11 @@ The BlantyreSepsis R package contains contains data code to replicate the analys
   
 <br />
 
-*Aetiology and determinants of mortality and long-term outcomes of sepsis in Malawi*
+*A longitudinal observational study of the aetiology and long-term outcomes of sepsis in Malawi reveals a key role of HIV and disseminated tuberculosis*
 
 <br />
 
-Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Stephen B Gordon^1,2^, Brian Faragher^2^, Melita A Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
+Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, Emma Smith^1^,^2^,  Jackie Duggan^4^, Tim Brooks^4^, Matthew Catton^4^, Jane Mallewa^5^, Grace Katha^5^, Stephen B Gordon^1,2^, Brian Faragher^2^, Melita A Gordon^1,3^, Jamie Rylance^1,2^, Nicholas A Feasey^1,2^
 
 1. Malawi Liverpool Wellcome Clinical Research Programme, Blantyre, Malawi
 2. Department of Clinical Sciences, Liverpool School of Tropical Medicine, Liverpool, UK
@@ -107,12 +106,20 @@ library(factoextra)
 library(mice)
 library(bayesplot)
 library(splines)
+library(here)
 
+# flag for savingfigures
 
+write_figs <- FALSE
+
+if (write_figs) {
+  dir.create(here("figures"))
+  dir.create(here("figures/upset_fig_files"))
+}
 #function for bootstrapping differnce in proportions
 
 propz <- function(dat) {
-  out <- sum(dat==1, na.rm = TRUE) / length(dat)
+  out <- sum(dat == 1, na.rm = TRUE) / length(dat)
   return(out)
 }
 
@@ -237,9 +244,234 @@ t1 %>%
 
 ```
 
+
+```{r st2-stratified-by-hivstatus}
+
+
+
+# Table of differences in variables  between hiv or not hiv
+# expressed as bootstrapped difference in expressed as median or proportion
+
+
+
+BTparticipants %>% 
+  mutate(
+    gcs_lessthan_15 = if_else(gcs < 15, true =  "yes", false = "no"),
+    ptsex = if_else(ptsex == "Male", "1", "0"),
+    ustand = as.character(ustand)
+  ) %>% 
+  select(
+    pid,
+    calc_age,
+    ptsex,
+    hivstatus,
+    ever_tb, 
+    screentemp,
+    t0hr,
+    t0rr,
+    t0sbp, 
+    t0dbp, 
+    t0spo2, 
+    gcs_lessthan_15, 
+    ustand,
+    days_unwell,
+    haemoglobin,
+    platelets, 
+    wcc, 
+    sodium,
+    potassium, 
+    co2, 
+    creatinine, 
+    lactate
+    ) %>% 
+  filter(!is.na(hivstatus)) ->
+  df.sum.tbl
+
+# bootstrap differences in proportions for character vars
+
+
+left_join(
+  df.sum.tbl %>%
+    select(where(is.character)) %>%
+    select(-pid) %>%
+    pivot_longer(-hivstatus) %>%
+    dplyr::group_by(name, hivstatus) %>%
+    summarise(str = paste0(
+      sum(grepl("1|yes", value, ignore.case = TRUE) , na.rm = TRUE),
+      " (",
+      sp_dc(100 * sum(grepl("1|yes", value, ignore.case = TRUE)) /
+              sum(!is.na(value)), 0),
+      "%)"
+    )) %>%
+    pivot_wider(
+      id_cols = "name",
+      names_from = "hivstatus",
+      values_from = "str"
+    ),
+  
+  df.sum.tbl %>%
+    select(where(is.character)) %>%
+    select(-pid) %>%
+    pivot_longer(-hivstatus) %>%
+    mutate(value = if_else(grepl("1|yes", value, ignore.case = TRUE),
+                           "1",
+                           "0")) %>% 
+    dplyr::group_by(name) %>%
+    dplyr::summarise(bs = list(boot.two.bca(value,
+                                            hivstatus,
+                                            propz))) %>%
+    mutate(
+      diff = map_dbl(bs, "Observed"),
+      diff.lci = map_dbl(bs,
+                         function(x)
+                           unlist((x["Confidence.limits"][[1]][[1]]))),
+      diff.uci = map_dbl(bs,
+                         function(x)
+                           unlist((x["Confidence.limits"][[1]][[2]])))
+    ) %>%
+    select(-bs) %>%
+    mutate(diff.str = paste0(
+      sp_dc(diff * 100, 0),
+      "% (",
+      sp_dc(diff.lci * 100, 0),
+      " to ",
+      sp_dc(diff.uci * 100, 0),
+      "%)"
+    )) ,
+  by = "name"
+) ->  diff.in.prop.cat.vars
+
+# bootstrap differences in medians for numeric vars
+
+df.sum.tbl %>% 
+  select(where(is.numeric) | ends_with("hivstatus")) %>% 
+  filter(!is.na(hivstatus)) %>%  
+  pivot_longer(-hivstatus) %>%
+  filter(!is.na(hivstatus) & !is.na(value)) %>% 
+  dplyr::group_by(name) %>%
+  dplyr::summarise(bs = list(boot.two.per(value, hivstatus, median))) %>%
+  mutate(diff = map_dbl(bs, "Observed"),
+         diff.lci = map_dbl(bs, 
+                            function(x) 
+                              unlist((x["Confidence.limits"][[1]][[1]]))),
+          diff.uci = map_dbl(bs, 
+                             function(x) 
+                               unlist((x["Confidence.limits"][[1]][[2]])))) %>% 
+  select(-bs) %>% 
+  mutate(diff.str = paste0(sp_dc(diff,1),
+                           " (", 
+                           sp_dc(diff.lci,1),
+                           " to ",
+                           sp_dc(diff.uci,1),
+                           ")"
+                           )
+  ) -> diff.in.median.num.vars
+
+
+#summary stats for tb and not tb groups
+
+df.sum.tbl %>% 
+  select(where(is.numeric) | ends_with("hivstatus")) %>%
+  pivot_longer(-hivstatus) %>% filter(!is.na(hivstatus)) %>%
+  dplyr::group_by(name, hivstatus) %>% 
+  dplyr::summarise( median = median(value, na.rm = T),
+                    LQ = quantile(value, 0.25, na.rm = T),
+                    UQ = quantile(value, 0.75, na.rm = T)) %>% 
+  mutate(
+    med_str = paste0(
+      sp_dc(median, 1), " (",
+      sp_dc(LQ, 1), "-",
+      sp_dc(UQ, 1) ,")")
+  ) %>% 
+  select(name, hivstatus, med_str) %>% 
+  pivot_wider(names_from = hivstatus, values_from = med_str) -> 
+  summ.stats.by.group
+
+
+st_t2_hivstrat <- merge(summ.stats.by.group, diff.in.median.num.vars, all.x = T)
+
+st_t2_hivstrat  <- bind_rows(st_t2_hivstrat,diff.in.prop.cat.vars)
+
+
+st_t2_hivstrat$boldcol <- FALSE 
+st_t2_hivstrat$boldcol[(st_t2_hivstrat$diff.lci >= 0 &
+                st_t2_hivstrat$diff.uci > 0) | (st_t2_hivstrat$diff.lci < 0 & 
+                                        st_t2_hivstrat$diff.uci <= 0)] <- TRUE
+
+
+
+
+st_t2_hivstrat[match(
+  c(
+    "calc_age",
+    "ptsex",
+    "days_unwell",
+    "ever_tb",
+    "screentemp",
+    "t0hr",
+    "t0sbp",
+    "t0dbp",
+    "t0rr",
+    "t0spo2",
+    "gcs_lessthan_15",
+    "ustand",
+    "haemoglobin",
+    "wcc",
+    "platelets",
+    "sodium",
+    "co2",
+    "creatinine",
+    "lactate"
+  ),
+  st_t2_hivstrat$name
+), ] -> st_t2_hivstrat
+
+
+
+st_t2_hivstrat <- st_t2_hivstrat[c("name", "Reactive", "Non reactive", "diff.str", "boldcol")]
+names(st_t2_hivstrat) <- c("Variable", "HIV infected", "HIV uninfected", "Difference", "boldcol")
+
+boldrows <- which(st_t2_hivstrat$boldcol %in% TRUE)
+
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "calc_age"] <- "Age (years)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "ptsex"] <- "Male sex"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "hivstatus"] <- "HIV Infected"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "haemoglobin"] <- "Haemoglobin (x10^9^} g/dL)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "cd4_absolute"] <- "CD4 count 10^6^ /L"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "screentemp"] <- "Temperature (C)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "ever_tb"] <- "Previous or current TB"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "t0hr"] <- "Heart rate (beats/min)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "t0sbp"] <- "Systolic BP (mmHg)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "t0dbp"] <- "Diastolic BP (mmHg)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "t0rr"] <- "Respiratory rate (breaths/min)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "t0spo2"] <- "Oxygen saturation (%)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "gcs_lessthan_15"] <- "GCS below 15"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "ustand"] <- "Unable to stand"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "lactate"] <- "Lactate (mmol/L)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "wcc"] <- "White cell count (x10^9^)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "platelets"] <- "Platelet count (x10^9^ /L)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "sodium"] <- "Sodium (mmol /L)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "co2"] <- "Bicarbonate (mmol /L)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "urea"] <- "Urea (mmol /L)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "creatinine"] <- "Creatinine (mmol /L)"
+st_t2_hivstrat$Variable[st_t2_hivstrat$Variable == "days_unwell"] <- "Length of time unwell for (days)"
+
+
+
+kbl(select(st_t2_hivstrat,-boldcol), 
+      row.names = F, caption = "SUPPLEMENTARY TABLE 2: Univariable associations with HIV status. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
+ kable_classic(full_width = FALSE) %>%
+  row_spec(boldrows, bold = T)
+
+
+
+
+
+```
+
 ### Treatments administered
 
-```{r ts2}
+```{r ts3}
 
 # Table of treatments administered
 
@@ -286,7 +518,7 @@ t2 %>%
     value.y = if_else(is.na(value.y), "", value.y)
     ) %>% 
     select(-variable) %>% 
-  kbl(caption = "SUPPLEMENTARY TABLE 2: Antimicroial therapies administered.",
+  kbl(caption = "SUPPLEMENTARY TABLE 3: Antimicroial therapies administered.",
       col.names = c("Antimicrobial therapy", 
                     "No. (proportion [95% CI]) participants", 
                     "Median (IQR) hours to administration"),
@@ -310,6 +542,8 @@ t2 %>%
 
 ```
 
+
+
 ### Aetiology
 
 
@@ -323,25 +557,37 @@ BTaetiology %>%
   dplyr::group_by(name) %>%
    dplyr::summarise(n_pos = sum(value == 1, na.rm = TRUE),
             n_neg = sum(value == 0 , na.rm = TRUE),
-            n_positive_tests= n_pos/(n_pos+n_neg),
-            n_positive_tests_lci =binom.test(n_pos, n_pos+n_neg)$conf.int[1],
-            n_positive_tests_uci =binom.test(n_pos, n_pos+n_neg)$conf.int[2],
+            n_positive_tests = n_pos/(n_pos + n_neg),
+            n_positive_tests_lci = binom.test(n_pos, n_pos + n_neg)$conf.int[1],
+            n_positive_tests_uci = binom.test(n_pos, n_pos + n_neg)$conf.int[2],
             
             positive_tests = paste0(n_pos,"/", n_pos + n_neg),
             positive_tests_prop = paste0(sp_dc(n_positive_tests*100,1), "%"),
-            positive_tests_prop_ci = paste0("(",sp_dc(n_positive_tests_lci*100,1),
-                                           "-",
-                                           sp_dc(n_positive_tests_uci*100,1),
-                                           "%)"),
-            n_prev= n_pos/225,
-            n_prev_lci =binom.test(n_pos, 225)$conf.int[1],
-            n_prev_uci =binom.test(n_pos, 225)$conf.int[2],
+            positive_tests_prop_ci = paste0(
+              "(",
+              sp_dc(n_positive_tests_lci * 100, 1),
+              "-",
+              sp_dc(n_positive_tests_uci *
+                      100, 1),
+              "%)"
+            ), 
+            n_prev = n_pos / 225,
+            n_prev_lci = binom.test(n_pos, 225)$conf.int[1],
+            n_prev_uci = binom.test(n_pos, 225)$conf.int[2], 
             prevalence = paste0(n_pos,"/225"),
             prevalence_prop = paste0("",sp_dc(n_prev*100,1), "%"),
             prevalence_prop_ci = paste0("(", sp_dc(n_prev_lci*100,1), "-",
                                 sp_dc(n_prev_uci*100,1),"%)"
                                 )
    ) %>% ungroup() %>% 
+    # arrange((fct_relevel(name, 
+    # "tb",
+    # "bsi.bacterial","csf.bacterial","inv.bacterial",
+    # "chik", "dengue","arbovirus",
+    # "malaria",
+    # "bsi.fungal","csf.fungal","inv.fungal",
+    # "SF", "ET","ricks", 
+    # "lepto", "borrelia", "rift_valley_fever"))) %>%
   arrange((fct_relevel(name, 
     "tb",
     "bsi.bacterial","csf.bacterial","inv.bacterial",
@@ -462,7 +708,7 @@ kable_classic(full_width = FALSE)
 
 ```
 
-```{r st3}
+```{r st4}
 
 # Table of acute and convalescent serology results
 
@@ -497,7 +743,7 @@ BTsera %>%
     org == "SF" ~ "Spotted fever group"
   )) %>%
   kbl(
-    caption = "SUPPLEMENTARY TABLE 3: Acute and convalescent serology results", 
+    caption = "SUPPLEMENTARY TABLE 4: Acute and convalescent serology results", 
     col.names = c("Organism", "IgG", "IgM", "IgG","IgM"),
     escape = FALSE) %>%
   kable_classic(full_width = FALSE) %>%
@@ -505,8 +751,47 @@ BTsera %>%
 
 ```
 
+```{r ricks-titres-plot,fig.cap = "SUPPLEMENTARY FIGURE E3: Day 28 Anti-Rickettsia antibody titres to Epidemic typhus (top) and Spotted fever group Rickettsioses", fig.width= 4, fig.height=3.2}
 
-```{r st4}
+BTsera %>% 
+  select(matches("pid|dilution")) %>% 
+  pivot_longer(-pid) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(value = if_else(value == "neg", "Negative", value),
+         value = factor(value, 
+                        levels = c("Negative",
+                                   "1:64",
+                                   "1:128",
+                                   "1:256",
+                                   "1:512",
+                                   "1:1024")),
+         Pathogen = if_else(grepl("SF", name),
+                                  "Spotted fever",
+                                  "Epidemic typhus"),
+         Antibody = str_extract(name, "IgG|IgM")) %>% 
+  ggplot(aes(value)) +
+  geom_bar(position = "dodge") +
+  facet_grid(Pathogen ~ Antibody) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  labs(x = "Antibody titre", y = "n") -> ricks_titre_plot
+
+if (write_figs) {
+  ggsave(
+   here("figures/SUP_F3_ricks-titres.pdf"),
+   ricks_titre_plot, width = 4, height = 3.2)
+ 
+  ggsave(
+   here("figures/SUP_F3_ricks-titres.tiff"),
+   ricks_titre_plot, width = 4, height = 3.2)
+}
+        
+
+
+```
+
+
+```{r st5}
 
 # Table of differences in variables  between tb or not tb
 # expressed as bootstrapped difference in expressed as median or proportion
@@ -524,44 +809,54 @@ BTparticipants %>%
 
 # bootstrap differences in proportions for character vars
 
+
 left_join(
-  df.sum.tbl %>% 
-    select(where(is.character)) %>% 
-    select(-pid) %>% 
-    pivot_longer(-tb) %>% 
-    dplyr::group_by(name,tb) %>%
-    summarise(str = paste0(sum(value == 1, na.rm = TRUE), 
-                           " (",
-                           sp_dc(100*sum(value == 1, na.rm = TRUE)/ 
-                                   sum(!is.na(value)),0),
-                           "%)")) %>% 
-    pivot_wider(id_cols = "name", 
-                names_from = "tb",
-                values_from = "str"),
-   
   df.sum.tbl %>%
-    select(where(is.character)) %>% 
-    select(-pid) %>% 
-    pivot_longer(-tb) %>% 
-    dplyr::group_by(name) %>% 
-  dplyr::summarise(bs = list(boot.two.bca(value, 
-                                          tb, 
-                                          propz))) %>%
-    mutate(diff = map_dbl(bs, "Observed"),
-           diff.lci = map_dbl(bs, 
-                              function(x) unlist(
-                                (x["Confidence.limits"][[1]][[1]]))),
-            diff.uci = map_dbl(bs, 
-                               function(x) unlist(
-                                 (x["Confidence.limits"][[1]][[2]])))) %>% 
-    select(-bs) %>% 
-    mutate(diff.str = paste0(sp_dc(diff *100,0),
-                           "% (", 
-                           sp_dc(diff.lci*100,0),
-                           " to ",
-                           sp_dc(diff.uci*100,0),
-                           "%)")) ,
-  by = "name") ->  diff.in.prop.cat.vars
+    select(where(is.character)) %>%
+    select(-pid) %>%
+    pivot_longer(-tb) %>%
+    dplyr::group_by(name, tb) %>%
+    summarise(str = paste0(
+      sum(value == 1, na.rm = TRUE),
+      " (",
+      sp_dc(100 * sum(value == 1, na.rm = TRUE) /
+              sum(!is.na(value)), 0),
+      "%)"
+    )) %>%
+    pivot_wider(
+      id_cols = "name",
+      names_from = "tb",
+      values_from = "str"
+    ),
+  
+  df.sum.tbl %>%
+    select(where(is.character)) %>%
+    select(-pid) %>%
+    pivot_longer(-tb) %>%
+    dplyr::group_by(name) %>%
+    dplyr::summarise(bs = list(boot.two.bca(value,
+                                            tb,
+                                            propz))) %>%
+    mutate(
+      diff = map_dbl(bs, "Observed"),
+      diff.lci = map_dbl(bs,
+                         function(x)
+                           unlist((x["Confidence.limits"][[1]][[1]]))),
+      diff.uci = map_dbl(bs,
+                         function(x)
+                           unlist((x["Confidence.limits"][[1]][[2]])))
+    ) %>%
+    select(-bs) %>%
+    mutate(diff.str = paste0(
+      sp_dc(diff * 100, 0),
+      "% (",
+      sp_dc(diff.lci * 100, 0),
+      " to ",
+      sp_dc(diff.uci * 100, 0),
+      "%)"
+    )) ,
+  by = "name"
+) ->  diff.in.prop.cat.vars
 
 # bootstrap differences in medians for numeric vars
 
@@ -586,7 +881,7 @@ df.sum.tbl %>%
                            sp_dc(diff.uci,1),
                            ")"
                            )
-         )-> diff.in.median.num.vars
+  ) -> diff.in.median.num.vars
 
 
 #summary stats for tb and not tb groups
@@ -630,7 +925,8 @@ st4[match(c("calc_age", "ptsex", "days_unwell",
              "lactate"), st4$name),] -> st4
 
 
-st4<- st4[c("name", "1", "0", "diff.str", "boldcol")]
+
+st4 <- st4[c("name", "1", "0", "diff.str", "boldcol")]
 names(st4) <- c("Variable", "TB", "no TB", "Difference", "boldcol")
 
 boldrows <- which(st4$boldcol %in% TRUE)
@@ -660,7 +956,7 @@ st4$Variable[st4$Variable == "days_unwell"] <- "Length of time unwell for (days)
 
 
 kbl(select(st4,-boldcol), 
-      row.names = F, caption = "SUPPLEMENTARY TABLE 4: Bivariate associations with TB diagnosis. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
+      row.names = F, caption = "SUPPLEMENTARY TABLE 5: Univariable associations with TB diagnosis. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
  kable_classic(full_width = FALSE) %>%
   row_spec(boldrows, bold = T)
 
@@ -670,7 +966,7 @@ kbl(select(st4,-boldcol),
 
 ```
 
-```{r st5 }
+```{r st6 }
 
 # Table of positive tests stratified by HIV status
 
@@ -720,18 +1016,18 @@ BTaetiology %>%
     name == "borrelia" ~ "PCR: Borrelia DNA detected",
     name == "chik" ~ "Chikununya IgM",
     name == "dengue" ~ "Dengue IgM",
-    name == "ET" ~ "Epidemic typhus group IgM",
+    name == "ET" ~ "Epidemic typhus IgG ≥ 1:512",
     name == "lepto" ~ "Leptospirosis IgM",
     name == "malaria" ~ "P. falciparum RDT",
     name == "rift_valley_fever" ~ "PCR: Rift valley fever virus detected",
-    name == "SF" ~ "Spotted fever group IgM",
+    name == "SF" ~ "Spotted fever IgG ≥ 1:512",
     name == "total" ~ "Number of participants",
     name == "Xpert" ~ "Sputum Xpert",
     name == "uLAM" ~ "Urinary LAM lateral flow assay",
     name == "mtb bsi" ~ "Mycobacterial blood culture"
   )) %>%
   kbl(caption = 
-      "SUPPLEMENTARY TABLE 5: Positive test reaults stratified by HIV status",
+      "SUPPLEMENTARY TABLE 6: Positive test reaults stratified by HIV status",
       col.names = c("Test", 
                     "Non reactive",
                     "Reactive",
@@ -791,30 +1087,47 @@ upset(as.data.frame(d), nsets = 5,order = "freq", text.scale = 1.5,
 
 upsetplot
 # to save - followed by a hacky legend to add
-#jpeg(file = "figures/upset_fig_files/MAIN_upset_diagnoosis.jpeg", width = 8, height = 5.5, 
-#     units = "in", res = 600)
-#upsetplot
-#dev.off()
-#pdf(file = "figures/upset_fig_files/MAIN_upset_diagnoosis.pdf", width = 8, height = 5.5)
-#upsetplot
 
-#dev.off()
 
-#d <- select(d, -abz)
-#mtcars %>% 
-#  ggplot(aes(cyl, fill = disp > 160)) + 
-#  geom_bar() + 
-#  scale_fill_manual(values = c("gray23",viridis_pal( option = "C")(6)[4]),
-#                    labels = c("No antibacterials", 
-#                               "Received antibacterials")) +
-#  theme(legend.title = element_blank()) -> skank
 
-#ggsave("figures/upset_fig_files/hacky_legend_for_upset.pdf", skank)
-
+if (write_figs) {
+  tiff(
+    file = here("figures/upset_fig_files/MAIN_upset_diagnosis.tiff"),
+    width = 8,
+    height = 5.5,
+    units = "in",
+    res = 600
+  )
+  upsetplot
+  dev.off()
+  
+  pdf(
+    file = here("figures/upset_fig_files/MAIN_upset_diagnosis.pdf"),
+    width = 8,
+    height = 5.5,
+    onefile = FALSE
+  )
+  upsetplot
+  dev.off()
+  
+  
+  mtcars %>%
+    ggplot(aes(cyl, fill = disp > 160)) +
+    geom_bar() +
+    scale_fill_manual(
+      values = c("gray23", viridis_pal(option = "C")(6)[4]),
+      labels = c("No antibacterials",
+                 "Received antibacterials")
+    ) +
+    theme(legend.title = element_blank()) -> skank
+  
+  ggsave(here("figures/upset_fig_files/hacky_legend_for_upset.tiff"),
+         skank)
+}
 
 ```
 
-```{r sf3, fig.width = 8, fig.height = 3,fig.cap = "SUPPLEMENTARY FIGURE 3: Pathogens identified by (A) aerobic blood culture and (B) multiplex PCR on blood. 26 blood cultures in 24/224 participants grew 28 pathogens in total. 26 pathogen PCR targets were identified in 31/122 samples. n here is number of samples."}
+```{r sf4, fig.width = 8, fig.height = 3,fig.cap = "SUPPLEMENTARY FIGURE 4: Pathogens identified by (A) aerobic blood culture and (B) multiplex PCR on blood. 26 blood cultures in 24/224 participants grew 28 pathogens in total. 26 pathogen PCR targets were identified in 31/122 samples. n here is number of samples."}
 
 # Plot pathogens identified in aerobic blood culture and on array card 
 
@@ -839,7 +1152,7 @@ BTbc %>% select(c(typhi, saen, saty, esco,
   name = fct_rev(fct_infreq(name))) %>% 
   ggplot(aes(name)) + geom_bar() + coord_flip() + theme_bw() +
   labs(x = "", y = "n")  +
-  scale_y_continuous(breaks = c(0:10))-> p1
+  scale_y_continuous(breaks = c(0:10)) -> p1
 
 BTarraycard %>% 
   select(contains("array_")) %>%
@@ -861,19 +1174,23 @@ BTarraycard %>%
            TRUE ~ name
            )) %>% 
    mutate(name = fct_rev(fct_infreq(name))) %>% 
-  ggplot(aes(name)) + geom_bar() + coord_flip() + theme_bw()+
+  ggplot(aes(name)) + geom_bar() + coord_flip() + theme_bw() +
   labs(x = "", y = "n")  +
-  scale_y_continuous(breaks = c(0:10))-> p2
+  scale_y_continuous(breaks = c(0:10)) -> p2
 
 (p1 | p2) + plot_annotation(tag_levels = 'A') -> p
 p
-#ggsave("figures/SUP_BC_PCR_dx.jpg", width = 8, height = 3, units = "in")
+if (write_figs) {
+  
+ggsave(here("figures/SUP_F4_BC_PCR_dx.tiff"), width = 8, height = 3, units = "in")
+ggsave(here("figures/SUP_F4_BC_PCR_dx.pdf"), width = 8, height = 3, units = "in")
+}
 ```
 
 
 
 
-```{r sf4, fig.cap = "SUPPLEMENTARY FIGURE 4: number of participants in whom a bacterial pathogen was identified: aggregated (A) and to species level (B). 43 bacterial pathogens were identified in 38 participants. n here is number of participants.", fig.height = 4, fig.width = 10}
+```{r sf5, fig.cap = "SUPPLEMENTARY FIGURE 5: number of participants in whom a bacterial pathogen was identified: aggregated (A) and to species level (B). 43 bacterial pathogens were identified in 38 participants. n here is number of participants.", fig.height = 4, fig.width = 10}
 
 # Plot bacterial pathogens identified
 
@@ -967,8 +1284,7 @@ bacteria.by.participant %>%
   labs(x = "", y = "n") +
   scale_y_continuous(breaks = c(0:20)) +
   labs(fill = "HIV status") +
-  scale_fill_manual(values = viridis_pal()(6)[c(2,4,5)]) -> pb.1 #+
-  #scale_fill_viridis_d(option = "D")
+  scale_fill_manual(values = viridis_pal()(6)[c(2,4,5)]) -> pb.1
 
 (pb.1 | pb.2) + 
   plot_layout(guides = 'collect') + 
@@ -976,12 +1292,16 @@ bacteria.by.participant %>%
 
 pb
 
-#ggsave("figures/SUP_bact_pathogens.jpeg", pb, height = 4, width = 10, units = "in")
+if (write_figs) {
+  
+ggsave(here("figures/SUP_F5_bact_pathogens.tiff"), pb, height = 4, width = 10, units = "in")
+ggsave(here("figures/SUP_F5_bact_pathogens.pdf"), pb, height = 4, width = 10, units = "in")
+}
 
 ```
 
 
-```{r sf5, fig.cap = "SUPPLEMENTARY FIGURE 5: Euler diagrm shwoing overlapping diagnoses", fig.height= 4, fig.width=6}
+```{r sf6, fig.cap = "SUPPLEMENTARY FIGURE 6: Euler diagrm shwoing overlapping diagnoses", fig.height= 4, fig.width=6}
 
 # Euler diagram of overlapping diagnoses
       
@@ -997,7 +1317,8 @@ as.ggplot(
                     borrelia, rift_valley_fever, Other, abz)) %>% 
           rename("Bacterial" = "Invasive bacterial infection",
                  "Fungal" = "Invasive fungal infection") %>% 
-          as.data.frame() 
+          as.data.frame(), 
+        shape = "ellipse" 
       ),
       fills = list(fill = viridis_pal()(6), alpha = 0.7)
     )
@@ -1005,8 +1326,11 @@ as.ggplot(
 
 
 p1
-#ggsave("figures/MAIN_euler_dx.jpg", width = 6, height =4, units = "in")
-
+if (write_figs) {
+  
+ggsave(here("figures/SUP_F6_euler_dx.tiff"), p1, width = 6, height = 4, units = "in")
+ggsave(here("figures/SUP_F6_euler_dx.pdf"), p1, width = 6, height = 4, units = "in")
+}
 ```
 
 ### Outcome
@@ -1235,7 +1559,7 @@ p$Variable[p$Variable == "fluid.6hr"] <- "IV fluid over 6hr (L)"
 
 
 kbl(select(p,-boldcol), 
-      row.names = F, caption = "TABLE 5: Bivariate associations with death by 28 days. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
+      row.names = F, caption = "TABLE 5: Univariable associations with death by 28 days. Numeric variables are presented as median (IQR) and categorical variables as proportions. Difference column shows difference in medians or difference in proportions with 95% confidence intervals. Variables shown in bold are those for which the 95% confidence intervals do not cross 0." ) %>%
  kable_classic(full_width = FALSE) %>%
   row_spec(boldrows, bold = T) %>%
   pack_rows("Host Variables", 1,5, bold = F) %>% 
@@ -1274,9 +1598,16 @@ psurv2 +
   labs(x = "Time post enrollment (days)") -> psurv2
 
 psurv2
-#ggsave("figures/MAIN_KM_plot.jpeg", psurv2, width = 6, height = 4)
+if (write_figs) {
+ 
+ggsave(here("figures/MAIN_F2_KM_plot.tiff"), psurv2, width = 6, height = 4)
+ggsave(here("figures/MAIN_F2_KM_plot.pdf"), psurv2, width = 6, height = 4)
+  
+   
+}
 
 ```
+
 ```{r cox-mod}
 
 # Fit Cox model
@@ -1293,7 +1624,7 @@ mcmc_intervals_data(m.b.cox,
 
 ```
 
-```{r sf6, fig.cap = "SUPPLEMENTARY FIGURE 6: Mortality stratified by diagnosis", fig.width = 5, fig.height = 3}
+```{r sf7, fig.cap = "SUPPLEMENTARY FIGURE 7: Mortality stratified by diagnosis", fig.width = 5, fig.height = 3}
 
 df.sum.tbl %>% 
   select(d28_death, malaria,dengue, chik, 
@@ -1325,10 +1656,25 @@ df.sum.tbl %>%
   theme_bw() -> paetiol
 
 paetiol
-
-#ggsave("figures/SUP_mort_by_dx.jpeg", paetiol, width = 5, height = 3,
-#       units = "in")
-
+if (write_figs) {
+  
+  ggsave(
+    here("figures/SUP_F7_mort_by_dx.pdf"),
+    paetiol,
+    width = 5,
+    height = 3,
+    units = "in"
+  )
+  
+  ggsave(
+    here("figures/SUP_F7_mort_by_dx.tiff"),
+    paetiol,
+    width = 5,
+    height = 3,
+    units = "in"
+  ) 
+  
+}
 ```
 
 ## Modelling determinents of outcome
@@ -1337,7 +1683,7 @@ paetiol
 
 Plot missing data priot to imputing missing data with the _mice_ package (below).
 
-```{r sf9, fig.cap = "SUPPLEMENTARY FIGURE 9: Missing data by variable. HIV related variables were not available for HIV-noninfected participants, recorded here as \\'Not done (HIV-)\\'. SpO2 = capilliary oxygen saturation, SBP/DBP = systolic/diastolic blood pressure, RR = respiratory rate, TB = tuberculosis, WCC = white cell count, ART = antiretroviral therapy, CPT = cotrimoxazole preventative therapy.", fig.width  = 6, fig.height = 4}
+```{r sf10, fig.cap = "SUPPLEMENTARY FIGURE 10: Missing data by variable. HIV related variables were not available for HIV-noninfected participants, recorded here as \\'Not done (HIV-)\\'. SpO2 = capilliary oxygen saturation, SBP/DBP = systolic/diastolic blood pressure, RR = respiratory rate, TB = tuberculosis, WCC = white cell count, ART = antiretroviral therapy, CPT = cotrimoxazole preventative therapy.", fig.width  = 6, fig.height = 4}
 
 # Plot missing data
 
@@ -1428,8 +1774,12 @@ BTparticipants %>%
   theme(legend.title = element_blank()) -> p.miss
 
 p.miss
-
-#ggsave( "figures/miss_data.jpg",p.miss, width = 6, height = 4, units = "in")
+if (write_figs) {
+  
+ggsave(here("figures/SUP_F10_miss_data.tiff"),p.miss, width = 6, height = 4, units = "in")
+ggsave(here("figures/SUP_F10_miss_data.pdf"),p.miss, width = 6, height = 4, units = "in")
+  
+}
 
 ```
 
@@ -1525,7 +1875,7 @@ df.mod.trans %>%
 ```
 
 
-```{r correlation-matrix, fig.cap="SUPPLEMENTARY FIGURE 7: Correlation matrix of included continuous variables (using Pearson’s correlation coefficient), row- and column-clustered using hierarchical clustering, showing very strong correlation between creatinine and urea and systolic and diastolic blood pressure. Also note negative correlation (though less strong) between renal failure and thrombocytopenia and low bicarbonate. Plt = Platelet count, WCC= White cell count, HCO3- = serum bicarbonate, SBP = systolic blood pressure, DBP = diastolic blood pressure, Hb = Haemoglobin, CD4 = CD4 cell count, RR = respiratory rate, Na = Serum sodium, Temp = Temperature, SpO2 = Capillary oxygen saturation, HR = Heart rate, Cr = Creatinine. Prefix log_ indicates log transformation of variable.", fig.height = 5, fig.width = 6}
+```{r correlation-matrix, fig.cap="SUPPLEMENTARY FIGURE 8: Correlation matrix of included continuous variables (using Pearson’s correlation coefficient), row- and column-clustered using hierarchical clustering, showing very strong correlation between creatinine and urea and systolic and diastolic blood pressure. Also note negative correlation (though less strong) between renal failure and thrombocytopenia and low bicarbonate. Plt = Platelet count, WCC= White cell count, HCO3- = serum bicarbonate, SBP = systolic blood pressure, DBP = diastolic blood pressure, Hb = Haemoglobin, CD4 = CD4 cell count, RR = respiratory rate, Na = Serum sodium, Temp = Temperature, SpO2 = Capillary oxygen saturation, HR = Heart rate, Cr = Creatinine. Prefix log_ indicates log transformation of variable.", fig.height = 5, fig.width = 6}
 
 # Generate and plot correlation matrix
 
@@ -1762,9 +2112,20 @@ ggbiplot_mod(p, circle = TRUE, labels.size = 1) +
 ```
 
 
-```{r pca2, fig.cap = "SUPPLEMENTARY FIGURE 8: Original host-severity variable contributions to PC1 (A), PC2 (B)  and PC3 (C) and original variables projected onto PC3 and PC4 (D).", fig.width = 8, fig.height = 8  }
+```{r pca2, fig.cap = "SUPPLEMENTARY FIGURE 9: Original host-severity variable contributions to PC1 (A), PC2 (B)  and PC3 (C) and original variables projected onto PC3 and PC4 (D).", fig.width = 8, fig.height = 8  }
 
 supp.pca.plots
+
+if (write_figs) {
+  ggsave(
+   here("figures/SUP_F9_pca_varplot.pdf"),
+   ricks_titre_plot, width = 8, height = 8)
+ 
+  ggsave(
+   here("figures/SUP_F9_pca_varplot.tiff"),
+   ricks_titre_plot, width = 8, height =8 )
+}
+        
 
 ```
 
@@ -2340,7 +2701,7 @@ brm_multiple(
 conditional_effects(b.m.tta.nonlin, effects = "time_to_abx") -> tta.ce
 
 tta.ce$time_to_abx %>% 
-  ggplot(aes((time_to_abx+tta.mean/tta.sd)*tta.sd, 
+  ggplot(aes((time_to_abx + tta.mean/tta.sd)*tta.sd, 
              estimate__, ymin = lower__, ymax = upper__)) + 
   geom_line() + 
   geom_ribbon(alpha = 0.3, fill = viridis(6, option = "C")[4])  + 
@@ -2364,6 +2725,7 @@ fluid.ce$fluid.6hr %>%
 
 ```
 
+### Final parameter estimate table
 
 ```{r mod-op-tab}
 # Make table of model outputs
@@ -2475,13 +2837,13 @@ mod.output.tab %>%
     ) -> mod.output.tab
 
 kbl(mod.output.tab,
-    row.names = F, caption = "SUPPLEMENTARY TABLE 7: Parameter estimates from models assessing effect of therapies on mortality, expressed as adjusted odds ratios with a point estimate (posterior median) and 95% credible intervals.") %>%
+    row.names = F, caption = "SUPPLEMENTARY TABLE 8: Parameter estimates from models assessing effect of therapies on mortality, expressed as adjusted odds ratios with a point estimate (posterior median) and 95% credible intervals.") %>%
   kable_classic(full_width = FALSE)
 
 #write_csv(mod.output.tab, "tables/SUP_mort_models_table.csv")
 ```
 
-
+### Final publication plot
 
 ```{r fig2, fig.cap = "FIGURE 3: A: Host-severity principal components 1 and 2 showing that PC1 defines an axis of HIV, immunosuppression (low CD4 count and anaemia) and shock (tachycardia, low blood pressre and bicarbonate) whereas PC2 is associated with sepsis-related organ dysfunction,  age, and male sex. B: Participants projected onto PC1 and 2 showing that participants who die (red circles) tend to have immunosuppression and shock (upper right), other sepsis related organ dysfunction (lower left), or both (lower right). C-E: Outputs of models predicting death by 28 days. Adjusted odds ratios and 95% credible intervals of effect of different antimicrobial therapies (C), predicted mortality as a function of time to antibacterial therapy (D) or volume of intravenous fluid received (E).", fig.width=8, fig.height=8 }
 
@@ -2493,12 +2855,17 @@ kbl(mod.output.tab,
   plot_layout(heights = c(2,1)) -> mort.model.plot.final
 
 mort.model.plot.final
-
-#ggsave( "figures/MAIN_mort_model.plot.jpeg",
-#        mort.model.plot.final, 
-#        width = 8, height = 8, units = "in")
-
+if (write_figs) {
+  
+ggsave( here("figures/MAIN_F3_mort_model.plot.pdf"),
+        mort.model.plot.final, 
+        width = 8, height = 8, units = "in")
+ggsave( here("figures/MAIN_F3_mort_model.plot.tiff"),
+        mort.model.plot.final, 
+        width = 8, height = 8, units = "in")
+}
 ```
+
 
 
 ### Reproducability
