@@ -24,7 +24,6 @@ Imports:
     viridis,
     grid,
     survival,
-    dplyr,
     tidyr,
     stringr,
     forcats,
@@ -36,13 +35,13 @@ Imports:
     patchwork,
     survminer,
     wBoot,
-    viridis,
     brms,
     pheatmap,
     factoextra,
     mice,
     bayesplot,
     splines
+    here
 Suggests: 
     knitr,
     rmarkdown
