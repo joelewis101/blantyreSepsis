@@ -40,7 +40,7 @@ Imports:
     factoextra,
     mice,
     bayesplot,
-    splines
+    splines,
     here
 Suggests: 
     knitr,
