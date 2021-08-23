@@ -23,7 +23,7 @@ The BlantyreSepsis R package contains contains data code to replicate the analys
   
 <br />
 
-*A longitudinal observational study of the aetiology and long-term outcomes of sepsis in Malawi reveals a key role of HIV and disseminated tuberculosis*
+*A longitudinal observational study of aetiology and long-term outcomes of sepsis in Malawi revealing the key role of disseminated tuberculosis*
 
 <br />
 
@@ -34,6 +34,8 @@ Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, E
 3. Department of Clinical Infection, Microbiology and Immunology, University of Liverpool, Liverpool, UK
 4. Rare and Imported Pathogens Laboratory, Public Health England, UK
 5. College of Medicine, University of Malawi ,Malawi
+
+Now published in _Clinical Infectious Diseases_ [here](https://academic.oup.com/cid/advance-article/doi/10.1093/cid/ciab710/6354427?guestAccessKey=89b11b5e-fb0a-4b94-b16b-7cb42a9012be)
 
 ## Installing and accessing data
 
@@ -780,10 +782,12 @@ if (write_figs) {
   ggsave(
    here("figures/SUP_F3_ricks-titres.pdf"),
    ricks_titre_plot, width = 4, height = 3.2)
+  
  
   ggsave(
-   here("figures/SUP_F3_ricks-titres.tiff"),
-   ricks_titre_plot, width = 4, height = 3.2)
+   here("figures/SUP_F3_ricks-titres.eps"),
+   ricks_titre_plot, width = 4, height = 3.2,
+   dpi = 600)
 }
         
 
@@ -1092,7 +1096,7 @@ upsetplot
 
 if (write_figs) {
   tiff(
-    file = here("figures/upset_fig_files/MAIN_upset_diagnosis.tiff"),
+    file = here("figures/upset_fig_files/MAIN_upset_diagnosis.eps"),
     width = 8,
     height = 5.5,
     units = "in",
@@ -1122,7 +1126,7 @@ if (write_figs) {
     theme(legend.title = element_blank()) -> skank
   
   ggsave(here("figures/upset_fig_files/hacky_legend_for_upset.tiff"),
-         skank)
+         skank, dpi = 600)
 }
 
 ```
@@ -1182,8 +1186,8 @@ BTarraycard %>%
 p
 if (write_figs) {
   
-ggsave(here("figures/SUP_F4_BC_PCR_dx.tiff"), width = 8, height = 3, units = "in")
-ggsave(here("figures/SUP_F4_BC_PCR_dx.pdf"), width = 8, height = 3, units = "in")
+ggsave(here("figures/SUP_F4_BC_PCR_dx.eps"), width = 8, height = 3, units = "in", dpi = 600)
+ggsave(here("figures/SUP_F4_BC_PCR_dx.pdf"), width = 8, height = 3, units = "in", dpi = 600)
 }
 ```
 
@@ -1294,7 +1298,7 @@ pb
 
 if (write_figs) {
   
-ggsave(here("figures/SUP_F5_bact_pathogens.tiff"), pb, height = 4, width = 10, units = "in")
+ggsave(here("figures/SUP_F5_bact_pathogens.tiff"), pb, height = 4, width = 10, units = "in",dpi = 600)
 ggsave(here("figures/SUP_F5_bact_pathogens.pdf"), pb, height = 4, width = 10, units = "in")
 }
 
@@ -1328,7 +1332,7 @@ as.ggplot(
 p1
 if (write_figs) {
   
-ggsave(here("figures/SUP_F6_euler_dx.tiff"), p1, width = 6, height = 4, units = "in")
+ggsave(here("figures/SUP_F6_euler_dx.tiff"), p1, width = 6, height = 4, units = "in", dpi = 600)
 ggsave(here("figures/SUP_F6_euler_dx.pdf"), p1, width = 6, height = 4, units = "in")
 }
 ```
@@ -1584,6 +1588,9 @@ psurv2 <- ggsurvplot(
           ylim = (c(0.6,1)), ggtheme = theme_bw(), 
           size = 0.5, 
           break.time.by = 30, 
+          linetype = c("strata"),
+          censor.shape = 124,
+          censor.size = 2.5,
           pval = "HR 2.0 (95% CrI 1.1-4.0) HIV+ vs HIV-", 
           pval.coord = c(15,0.65), pval.size = 4
 )
@@ -1595,13 +1602,16 @@ psurv2 +
         legend.title = element_blank()) +   
   scale_color_manual(labels = c("HIV-", "HIV+"), 
                      values = viridis(6, option = "C")[c(1,4)]) + 
+  scale_linetype_manual(labels = c("HIV-", "HIV+"),
+                        values = c("dashed", "solid")) +
   labs(x = "Time post enrollment (days)") -> psurv2
 
 psurv2
 if (write_figs) {
  
-ggsave(here("figures/MAIN_F2_KM_plot.tiff"), psurv2, width = 6, height = 4)
 ggsave(here("figures/MAIN_F2_KM_plot.pdf"), psurv2, width = 6, height = 4)
+ggsave(here("figures/MAIN_F2_KM_plot.tiff"), psurv2, width = 6, height = 4,
+       dpi = 600)
   
    
 }
@@ -1671,7 +1681,8 @@ if (write_figs) {
     paetiol,
     width = 5,
     height = 3,
-    units = "in"
+    units = "in",
+    dpi = 600
   ) 
   
 }
@@ -1776,7 +1787,7 @@ BTparticipants %>%
 p.miss
 if (write_figs) {
   
-ggsave(here("figures/SUP_F10_miss_data.tiff"),p.miss, width = 6, height = 4, units = "in")
+ggsave(here("figures/SUP_F10_miss_data.tiff"),p.miss, width = 6, height = 4, units = "in",dpi = 600)
 ggsave(here("figures/SUP_F10_miss_data.pdf"),p.miss, width = 6, height = 4, units = "in")
   
 }
@@ -2079,29 +2090,37 @@ ggbiplot_mod(p, circle = TRUE, choices = 3:4) + theme_bw() -> p.pca.3.4
 
 p.out %>% 
   filter(!is.na(d28_death)) %>% 
-  ggplot(aes(PC1, PC2, fill = as.factor(d28_death))) +
+  ggplot(aes(PC1, PC2, fill = as.factor(d28_death),
+             color = as.factor(d28_death), 
+             shape = as.factor(d28_death),
+             alpha = as.factor(d28_death))) +
   geom_point(
-    pch = 21,
-    color = "black",
-    size = 3,
-    alpha = 0.3
+  # pch = 21,
+    size = 2,
+   # alpha = 0.3
   ) +
   theme_bw() +
-  scale_fill_manual(
-    values = viridis(6, option = "C")[c(1, 4)],
+  scale_color_manual(
+    values = c(viridis(6, option = "C")[4],"black"),
     labels = c("Survived", "Died"),
     name = "28 day outcome"
   ) +
+  scale_alpha_manual(
+    values = c(0.4,1), 
+    labels = c("Survived", "Died"),
+    name = "28 day outcome"
+  ) +
+  scale_fill_manual(
+    values = viridis(6, option = "C")[c(4, 1)],
+    labels = c("Survived", "Died"),
+    name = "28 day outcome"
+  ) +
+    scale_shape_manual(values = c(23,21),
+    labels = c("Survived", "Died"),
+    name = "28 day outcome" ) +
   geom_vline(aes(xintercept = 0)) +
   geom_hline(aes(yintercept = 0)) +
-  theme(legend.position = "top") +
-  geom_point(
-    pch = 21,
-    color = "black",
-    size = 3,
-    data =
-      subset(p.out,!is.na(d28_death) & d28_death == 1)
-  ) -> p5
+  theme(legend.position = "top")  -> p5
 
 ggbiplot_mod(p, circle = TRUE, labels.size = 1) + 
   theme_bw() -> p1
@@ -2262,9 +2281,9 @@ bind_cols(
 mice(df.mod.trans.scale.plus.metadata, maxit = 0) -> ini
 pm <- ini$predictorMatrix
 ini$method -> meth
-pm[,(ncol(df.mod.trans) +2):ncol(df.mod.trans.scale.plus.metadata)] <- 0
-pm[(ncol(df.mod.trans) +2):ncol(df.mod.trans.scale.plus.metadata),] <- 0
-meth[(ncol(df.mod.trans) +2):ncol(df.mod.trans.scale.plus.metadata)] <- ""
+pm[, (ncol(df.mod.trans) + 2):ncol(df.mod.trans.scale.plus.metadata)] <- 0
+pm[(ncol(df.mod.trans) + 2):ncol(df.mod.trans.scale.plus.metadata),] <- 0
+meth[(ncol(df.mod.trans) + 2):ncol(df.mod.trans.scale.plus.metadata)] <- ""
 df.mod.trans.scale.plus.metadata$time_to_abx <- as.numeric(
   df.mod.trans.scale.plus.metadata$time_to_abx
 )
@@ -2579,7 +2598,7 @@ df.plot %>%
   scale_color_manual(values = c(fill = 
                                 viridis(6, option = "C")[4],
                                 "black")) +
-  scale_shape_manual(values = c(4,16))-> p.effects
+  scale_shape_manual(values = c(4, 16))-> p.effects
 
 p.effects
 ```
@@ -2712,7 +2731,7 @@ tta.ce$time_to_abx %>%
 conditional_effects(b.m.fluid, effects = "fluid.6hr") -> fluid.ce
 
 fluid.ce$fluid.6hr %>% 
-  ggplot(aes((fluid.6hr+fluid.mean/fluid.sd)*(fluid.sd), 
+  ggplot(aes((fluid.6hr + fluid.mean/fluid.sd)*(fluid.sd), 
              estimate__, ymin = lower__, ymax = upper__)) + geom_line() + 
   geom_ribbon(alpha = 0.3, fill = viridis(6, option = "C")[4])  + 
   coord_cartesian(ylim = c(0,0.3)) + 
@@ -2720,7 +2739,7 @@ fluid.ce$fluid.6hr %>%
   labs(x = "Fluid (L) over 6hr", y = "28-day mortality") -> p.fluid
 
 
-(p.fluid | p.tta ) +plot_annotation(tag_levels = "A")
+(p.fluid | p.tta ) + plot_annotation(tag_levels = "A")
 
 
 ```
@@ -2862,7 +2881,8 @@ ggsave( here("figures/MAIN_F3_mort_model.plot.pdf"),
         width = 8, height = 8, units = "in")
 ggsave( here("figures/MAIN_F3_mort_model.plot.tiff"),
         mort.model.plot.final, 
-        width = 8, height = 8, units = "in")
+        width = 8, height = 8, units = "in",
+        dpi = 600)
 }
 ```
 
