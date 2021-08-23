@@ -22,7 +22,7 @@ The BlantyreSepsis R package contains data and code to replicate the analysis of
   
 <br />
 
-*A longitudinal observational study of the aetiology and long-term outcomes of sepsis in Malawi reveals a key role of HIV and disseminated tuberculosis*
+*A longitudinal observational study of aetiology and long-term outcomes of sepsis in Malawi revealing the key role of disseminated tuberculosis*
 
 <br />
 
@@ -33,6 +33,8 @@ Joseph M Lewis^1,2,3^, , Madalitso Mphasa^1^, Lucy Keyala^1^, Rachel Banda^1^, E
 3. Department of Clinical Infection, Microbiology and Immunology, University of Liverpool, Liverpool, UK
 4. Rare and Imported Pathogens Laboratory, Public Health England, UK
 5. College of Medicine, University of Malawi, Malawi
+
+Now published in _Clinical Infectious Diseases_ [here](https://academic.oup.com/cid/advance-article/doi/10.1093/cid/ciab710/6354427?guestAccessKey=89b11b5e-fb0a-4b94-b16b-7cb42a9012be)
 
 ## Installing and accessing data
 

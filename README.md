@@ -11,9 +11,8 @@ analysis of the manuscript:
 
 <br />
 
-*A longitudinal observational study of the aetiology and long-term
-outcomes of sepsis in Malawi reveals a key role of HIV and disseminated
-tuberculosis*
+*A longitudinal observational study of aetiology and long-term outcomes
+of sepsis in Malawi revealing the key role of disseminated tuberculosis*
 
 <br />
 
@@ -34,6 +33,9 @@ Feasey<sup>1,2</sup>
     University of Liverpool, Liverpool, UK
 4.  Rare and Imported Pathogens Laboratory, Public Health England, UK
 5.  College of Medicine, University of Malawi, Malawi
+
+Now published in *Clinical Infectious Diseases*
+[here](https://academic.oup.com/cid/advance-article/doi/10.1093/cid/ciab710/6354427?guestAccessKey=89b11b5e-fb0a-4b94-b16b-7cb42a9012be)
 
 ## Installing and accessing data
 
